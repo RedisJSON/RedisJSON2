@@ -12,7 +12,9 @@ pub struct Error {
 
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {
-        Error { msg: format!("{}", e.to_string()) }
+        Error {
+            msg: format!("{}", e.to_string()),
+        }
     }
 }
 
@@ -52,6 +54,6 @@ impl RedisDoc {
         eprintln!("Serializing back to JSON");
 
         let s = serde_json::to_string(&self.data)?;
-        return Ok(s)
+        return Ok(s);
     }
 }

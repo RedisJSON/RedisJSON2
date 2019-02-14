@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate redismodule;
 
-use redismodule::{Context, RedisResult, NextArg};
 use redismodule::native_types::RedisType;
+use redismodule::{Context, NextArg, RedisResult};
 
 mod redisdoc;
 
@@ -38,8 +38,8 @@ fn doc_get(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key_writable(&key);
 
     let value = match key.get_value::<RedisDoc>(&DOC_REDIS_TYPE)? {
-        Some(doc) => { doc.to_string()?.into() }
-        None => ().into()
+        Some(doc) => doc.to_string()?.into(),
+        None => ().into(),
     };
 
     Ok(value)
