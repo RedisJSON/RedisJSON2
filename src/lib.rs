@@ -81,7 +81,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
             "NEWLINE" => args.next(), // TODO add support
             "SPACE" => args.next(), // TODO add support
             "NOESCAPE" => continue, // TODO add support
-            "." => break String::from("$"), // backward compatibility suuport
+            "." => break String::from("$"), // backward compatibility support
             _ => break arg
         };
     };
@@ -159,6 +159,85 @@ fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
     Ok(value)
 }
 
+fn json_num_incrby(ctx: &Context, args: Vec<String>) -> RedisResult {
+    json_num_op(ctx, args, |num1, num2| {num1+num2})
+}
+
+fn json_num_multby(ctx: &Context, args: Vec<String>) -> RedisResult {
+    json_num_op(ctx, args, |num1, num2| {num1*num2})
+}
+
+fn json_num_powby(ctx: &Context, args: Vec<String>) -> RedisResult {
+    json_num_op(ctx, args, |num1, num2| {num1.powf(num2)})
+}
+
+fn json_num_op<F: Fn(f64, f64) -> f64>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult {
+    let mut args = args.into_iter().skip(1);
+
+    let key = args.next_string()?;
+    let path = args.next_string()?;
+    let number: f64 = args.next_string()?.parse()?;
+
+    let key = ctx.open_key_writable(&key);
+
+    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => Ok(doc.num_op(&path, number, fun)?.into()),
+        None => Err("".into())
+    }
+}
+
+fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_obj_keys(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_debug(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_forget(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
 //////////////////////////////////////////////////////
 
 redis_module! {
@@ -168,11 +247,26 @@ redis_module! {
         REDIS_JSON_TYPE,
     ],
     commands: [
-        ["json.set", json_set, "write"],
         ["json.del", json_del, "write"],
         ["json.get", json_get, ""],
         ["json.mget", json_mget, ""],
-        ["json.strlen", json_strlen, ""],
+        ["json.set", json_set, "write"],
         ["json.type", json_type, ""],
+        ["json.numincrby", json_num_incrby, ""],
+        ["json.nummultby", json_num_multby, ""],
+        ["json.numpowby", json_num_powby, ""],
+        ["json.strappend", json_str_append, ""],
+        ["json.strlen", json_str_len, ""],
+        ["json.arrappend", json_arr_append, ""],
+        ["json.arrindex", json_arr_index, ""],
+        ["json.arrinsert", json_arr_insert, ""],
+        ["json.arrlen", json_arr_len, ""],
+        ["json.arrpop", json_arr_pop, ""],
+        ["json.arrtrim", json_arr_trim, ""],
+        ["json.objkeys", json_obj_keys, ""],
+        ["json.objlen", json_obj_len, ""],
+        ["json.debug", json_debug, ""],
+        ["json.forget", json_forget, ""],
+        ["json.resp", json_resp, ""],
     ],
 }

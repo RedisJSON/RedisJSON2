@@ -4,7 +4,7 @@
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
 use std::mem;
-use serde_json::Value;
+use serde_json::{Value, Number};
 use jsonpath_lib::{JsonPathError};
 
 pub struct Error {
@@ -17,12 +17,17 @@ impl From<String> for Error {
     }
 }
 
+impl From<&str> for Error {
+    fn from(e: &str) -> Self {
+        Error { msg: e.to_string() }
+    }
+}
+
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {
         Error { msg: e.to_string() }
     }
 }
-
 
 impl From<JsonPathError> for Error {
     fn from(e: JsonPathError) -> Self {
@@ -81,7 +86,7 @@ impl RedisJSON {
     pub fn str_len(&self, path: &str) -> Result<usize, Error> {
         match self.get_doc(path)?.as_str() {
             Some(s) => Ok(s.len()),
-            None => Err(Error{msg: "ERR wrong type of path value".to_string()})
+            None => Err("ERR wrong type of path value".into())
         }
     }
 
@@ -95,6 +100,61 @@ impl RedisJSON {
             Value::Object(_) => "object",
         };
         Ok(s.to_string())
+    }
+
+    pub fn num_op<F: Fn(f64, f64) -> f64>(&mut self, path: &str, number: f64, fun: F) -> Result<String, Error> {
+        let current_data = mem::replace(&mut self.data, Value::Null);
+        let mut error= "";
+        let mut result : f64 = 0.0;
+        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| {
+            match v {
+                Value::Number(curr) => {
+                    match curr.as_f64() {
+                        Some(curr_value) => {
+                            result = fun(curr_value, number);
+                            match Number::from_f64(result) {
+                                Some(new_value) => {
+                                    Value::Number(new_value)
+                                },
+                                None => {
+                                    error = "ERR can't represnt result as Number";
+                                    v.clone()
+                                }
+                            }
+                        },
+                        None => {
+                            error = "ERR can't convert current value as f64";
+                            v.clone()
+                        }
+                    }
+                },
+                Value::Null => {
+                    error = "ERR wrong type of path value - expected a number but found Null";
+                    v.clone()
+                },
+                Value::Bool(_) => {
+                    error = "ERR wrong type of path value - expected a number but found bool";
+                    v.clone()
+                },
+                Value::String(_) => {
+                    error = "ERR wrong type of path value - expected a number but found string";
+                    v.clone()
+                },
+                Value::Array(_) => {
+                    error = "ERR wrong type of path value - expected a number but found array";
+                    v.clone()
+                },
+                Value::Object(_) => {
+                    error = "ERR wrong type of path value - expected a number but found object";
+                    v.clone()
+                }
+            }
+        })?;
+        if error == "" {
+            Ok(result.to_string())
+        } else {
+            Err(error.into())
+        }
     }
 
     fn get_doc<'a>(&'a self, path: &'a str) -> Result<&'a Value, Error> {
