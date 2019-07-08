@@ -91,20 +91,24 @@ impl RedisJSON {
     }
 
     pub fn get_type(&self, path: &str) -> Result<String, Error> {
-        let s = match self.get_doc(path)? {
+        let s = RedisJSON::value_name(self.get_doc(path)?);
+        Ok(s.to_string())
+    }
+
+    fn value_name(value: &Value) -> &str {
+        match value {
             Value::Null => "null",
             Value::Bool(_) => "boolean",
             Value::Number(_) => "number",
             Value::String(_) => "string",
             Value::Array(_) => "array",
             Value::Object(_) => "object",
-        };
-        Ok(s.to_string())
+        }
     }
 
     pub fn num_op<F: Fn(f64, f64) -> f64>(&mut self, path: &str, number: f64, fun: F) -> Result<String, Error> {
         let current_data = mem::replace(&mut self.data, Value::Null);
-        let mut error= "";
+        let mut error= String::new();
         let mut result : f64 = 0.0;
         self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| {
             match v {
@@ -117,35 +121,20 @@ impl RedisJSON {
                                     Value::Number(new_value)
                                 },
                                 None => {
-                                    error = "ERR can't represnt result as Number";
+                                    error.push_str("ERR can't represnt result as Number");
                                     v.clone()
                                 }
                             }
                         },
                         None => {
-                            error = "ERR can't convert current value as f64";
+                            error.push_str("ERR can't convert current value as f64");
                             v.clone()
                         }
                     }
                 },
-                Value::Null => {
-                    error = "ERR wrong type of path value - expected a number but found Null";
-                    v.clone()
-                },
-                Value::Bool(_) => {
-                    error = "ERR wrong type of path value - expected a number but found bool";
-                    v.clone()
-                },
-                Value::String(_) => {
-                    error = "ERR wrong type of path value - expected a number but found string";
-                    v.clone()
-                },
-                Value::Array(_) => {
-                    error = "ERR wrong type of path value - expected a number but found array";
-                    v.clone()
-                },
-                Value::Object(_) => {
-                    error = "ERR wrong type of path value - expected a number but found object";
+                _ => {
+                    error.push_str("ERR wrong type of path value - expected a number but found ");
+                    error.push_str(RedisJSON::value_name(&v));
                     v.clone()
                 }
             }
