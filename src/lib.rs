@@ -129,7 +129,7 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
 }
 
 
-fn json_strlen(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
     let path = args.next_string()?;
@@ -187,10 +187,6 @@ fn json_num_op<F: Fn(f64, f64) -> f64>(ctx: &Context, args: Vec<String>, fun: F)
 }
 
 fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
-}
-
-fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
