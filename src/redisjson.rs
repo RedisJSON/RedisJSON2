@@ -90,6 +90,20 @@ impl RedisJSON {
         }
     }
 
+    pub fn arr_len(&self, path: &str) -> Result<usize, Error> {
+        match self.get_doc(path)?.as_array() {
+            Some(s) => Ok(s.len()),
+            None => Err("ERR wrong type of path value".into())
+        }
+    }
+
+    pub fn obj_len(&self, path: &str) -> Result<usize, Error> {
+        match self.get_doc(path)?.as_object() {
+            Some(s) => Ok(s.len()),
+            None => Err("ERR wrong type of path value".into())
+        }
+    }
+
     pub fn get_type(&self, path: &str) -> Result<String, Error> {
         let s = RedisJSON::value_name(self.get_doc(path)?);
         Ok(s.to_string())

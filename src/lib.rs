@@ -6,7 +6,7 @@ use redismodule::native_types::RedisType;
 
 mod redisjson;
 
-use crate::redisjson::RedisJSON;
+use crate::redisjson::{RedisJSON, Error};
 
 static REDIS_JSON_TYPE: RedisType = RedisType::new("RedisJSON");
 
@@ -203,7 +203,7 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
 }
 
 fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+    json_len(ctx, args, | doc, path| doc.arr_len(path))
 }
 
 fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
@@ -219,7 +219,7 @@ fn json_obj_keys(ctx: &Context, args: Vec<String>) -> RedisResult {
 }
 
 fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+    json_len(ctx, args, | doc, path| doc.obj_len(path))
 }
 
 fn json_debug(ctx: &Context, args: Vec<String>) -> RedisResult {
@@ -232,6 +232,21 @@ fn json_forget(ctx: &Context, args: Vec<String>) -> RedisResult {
 
 fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
+}
+
+fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult {
+    let mut args = args.into_iter().skip(1);
+    let key = args.next_string()?;
+    let path = args.next_string()?;
+
+    let key = ctx.open_key_writable(&key);
+
+    let length = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => fun(&doc, &path)?.into(),
+        None => ().into()
+    };
+
+    Ok(length)
 }
 
 //////////////////////////////////////////////////////
