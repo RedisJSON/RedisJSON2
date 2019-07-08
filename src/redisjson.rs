@@ -139,7 +139,7 @@ impl RedisJSON {
                 }
             }
         })?;
-        if error == "" {
+        if error.is_empty() {
             Ok(result.to_string())
         } else {
             Err(error.into())
