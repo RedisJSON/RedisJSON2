@@ -16,11 +16,27 @@ pub enum SetOptions {
     AlreadyExists,
 }
 
+///
+/// backward compatibility convector for RedisJSON 1.x clients
+///
+fn backward_path(mut path: String) -> String {
+    if !path.starts_with("$") {
+        if path == "." {
+            path.replace_range(..1, "$");
+        } else if path.starts_with(".") {
+            path.insert(0, '$');
+        } else {
+            path.insert_str(0, "$.");
+        }
+    }
+    return path;
+}
+
 fn json_del(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = args.next_string()?;
+    let path = backward_path(args.next_string()?);
 
     let key = ctx.open_key_writable(&key);
     let deleted = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
@@ -34,7 +50,7 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = args.next_string()?;
+    let path = backward_path(args.next_string()?);
     let value = args.next_string()?;
 
     let set_option = args.next()
@@ -81,14 +97,10 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
             "NEWLINE" => args.next(), // TODO add support
             "SPACE" => args.next(), // TODO add support
             "NOESCAPE" => continue, // TODO add support
-            "." => break String::from("$"), // backward compatibility support
             _ => break arg
         };
     };
-
-    if path.starts_with(".") { // backward compatibility
-        path.insert(0, '$');
-    }
+    path = backward_path(path);
 
     let key = ctx.open_key_writable(&key);
 
@@ -106,10 +118,7 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
         return Err(RedisError::WrongArity);
     }
     if let Some(path) = args.last() {
-        let mut path = path.clone();
-        if path.starts_with(".") { // backward compatibility
-            path.insert(0, '$');
-        }
+        let path = backward_path(path.to_string());
         let mut results: Vec<String> = Vec::with_capacity(args.len()-2);
         for key in &args[1..args.len()-1] {
             let redis_key = ctx.open_key_writable(&key);
@@ -132,7 +141,7 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
 fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = args.next_string()?;
+    let path = backward_path(args.next_string()?);
 
     let key = ctx.open_key_writable(&key);
 
@@ -147,7 +156,7 @@ fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = args.next_string()?;
+    let path = backward_path(args.next_string()?);
 
     let key = ctx.open_key_writable(&key);
 
@@ -175,7 +184,7 @@ fn json_num_op<F: Fn(f64, f64) -> f64>(ctx: &Context, args: Vec<String>, fun: F)
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = args.next_string()?;
+    let path = backward_path(args.next_string()?);
     let number: f64 = args.next_string()?.parse()?;
 
     let key = ctx.open_key_writable(&key);
@@ -237,7 +246,7 @@ fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
 fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = args.next_string()?;
+    let path = backward_path(args.next_string()?);
 
     let key = ctx.open_key_writable(&key);
 
@@ -263,21 +272,21 @@ redis_module! {
         ["json.mget", json_mget, ""],
         ["json.set", json_set, "write"],
         ["json.type", json_type, ""],
-        ["json.numincrby", json_num_incrby, ""],
-        ["json.nummultby", json_num_multby, ""],
-        ["json.numpowby", json_num_powby, ""],
-        ["json.strappend", json_str_append, ""],
+        ["json.numincrby", json_num_incrby, "write"],
+        ["json.nummultby", json_num_multby, "write"],
+        ["json.numpowby", json_num_powby, "write"],
+        ["json.strappend", json_str_append, "write"],
         ["json.strlen", json_str_len, ""],
-        ["json.arrappend", json_arr_append, ""],
+        ["json.arrappend", json_arr_append, "write"],
         ["json.arrindex", json_arr_index, ""],
-        ["json.arrinsert", json_arr_insert, ""],
+        ["json.arrinsert", json_arr_insert, "write"],
         ["json.arrlen", json_arr_len, ""],
-        ["json.arrpop", json_arr_pop, ""],
-        ["json.arrtrim", json_arr_trim, ""],
+        ["json.arrpop", json_arr_pop, "write"],
+        ["json.arrtrim", json_arr_trim, "write"],
         ["json.objkeys", json_obj_keys, ""],
         ["json.objlen", json_obj_len, ""],
         ["json.debug", json_debug, ""],
-        ["json.forget", json_forget, ""],
+        ["json.forget", json_del, "write"],
         ["json.resp", json_resp, ""],
     ],
 }
