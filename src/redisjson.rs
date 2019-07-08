@@ -121,13 +121,13 @@ impl RedisJSON {
                                     Value::Number(new_value)
                                 },
                                 None => {
-                                    error.push_str("ERR can't represnt result as Number");
+                                    error.push_str("ERR can not represent result as Number");
                                     v.clone()
                                 }
                             }
                         },
                         None => {
-                            error.push_str("ERR can't convert current value as f64");
+                            error.push_str("ERR can not convert current value as f64");
                             v.clone()
                         }
                     }
