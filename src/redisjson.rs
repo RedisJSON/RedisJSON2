@@ -72,7 +72,7 @@ impl RedisJSON {
 
         let mut deleted = 0;
         self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| {
-            if(!v.is_null()) {
+            if !v.is_null() {
                 deleted = deleted + 1;
             }
             Value::Null
