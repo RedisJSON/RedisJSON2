@@ -182,7 +182,7 @@ fn json_num_op<F: Fn(f64, f64) -> f64>(ctx: &Context, args: Vec<String>, fun: F)
 
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => Ok(doc.num_op(&path, number, fun)?.into()),
-        None => Err("".into())
+        None => Err("ERR could not perform this operation on a key that doesn't exist".into())
     }
 }
 
