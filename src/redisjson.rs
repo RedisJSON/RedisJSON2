@@ -132,24 +132,15 @@ impl RedisJSON {
         let mut result: f64 = 0.0;
 
         self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| {
-            if let Value::Number(curr) = v {
-                if let Some(curr_value) = curr.as_f64() {
-                    result = fun(curr_value, number);
-
-                    if let Some(new_value) = Number::from_f64(result) {
-                        Value::Number(new_value)
-                    } else {
-                        errors.push("ERR can not represent result as Number".to_string());
-                        v.clone()
-                    }
-                } else {
-                    errors.push("ERR can not convert current value as f64".to_string());
+            match apply_op(v, number, &fun) {
+                Ok((res, new_value)) => {
+                    result = res;
+                    new_value
+                }
+                Err(e) => {
+                    errors.push(e);
                     v.clone()
                 }
-            } else {
-                errors.push(format!("ERR wrong type of path value - expected a number but found {}",
-                                       RedisJSON::value_name(&v)));
-                v.clone()
             }
         })?;
 
@@ -168,3 +159,24 @@ impl RedisJSON {
         }
     }
 }
+
+fn apply_op<F>(v: &Value, number: f64, fun: F) -> Result<(f64, Value), String>
+    where F: Fn(f64, f64) -> f64 {
+    if let Value::Number(curr) = v {
+        if let Some(curr_value) = curr.as_f64() {
+            let res = fun(curr_value, number);
+
+            if let Some(new_value) = Number::from_f64(res) {
+                Ok((res, Value::Number(new_value)))
+            } else {
+                Err("ERR can not represent result as Number".to_string())
+            }
+        } else {
+            Err("ERR can not convert current value as f64".to_string())
+        }
+    } else {
+        Err(format!("ERR wrong type of path value - expected a number but found {}",
+                    RedisJSON::value_name(&v)))
+    }
+}
+
