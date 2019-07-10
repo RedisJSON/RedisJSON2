@@ -3,9 +3,9 @@
 // Translate between JSON and tree of Redis objects:
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
+use jsonpath_lib::JsonPathError;
+use serde_json::{Number, Value};
 use std::mem;
-use serde_json::{Value, Number};
-use jsonpath_lib::{JsonPathError};
 
 pub struct Error {
     msg: String,
@@ -31,7 +31,9 @@ impl From<serde_json::Error> for Error {
 
 impl From<JsonPathError> for Error {
     fn from(e: JsonPathError) -> Self {
-        Error { msg: format!("{:?}", e) }
+        Error {
+            msg: format!("{:?}", e),
+        }
     }
 }
 
@@ -59,9 +61,7 @@ impl RedisJSON {
         let json: Value = serde_json::from_str(data)?;
 
         let current_data = mem::replace(&mut self.data, Value::Null);
-        let new_data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
-            json.clone()
-        })?;
+        let new_data = jsonpath_lib::replace_with(current_data, path, &mut |_v| json.clone())?;
         self.data = new_data;
 
         Ok(())
@@ -71,9 +71,9 @@ impl RedisJSON {
         let current_value = mem::replace(&mut self.data, Value::Null);
         self.data = jsonpath_lib::delete(current_value, path)?;
 
-        let res : usize = match self.data {
+        let res: usize = match self.data {
             Value::Null => 0,
-            _ => 1
+            _ => 1,
         };
         Ok(res)
     }
@@ -86,21 +86,21 @@ impl RedisJSON {
     pub fn str_len(&self, path: &str) -> Result<usize, Error> {
         match self.get_doc(path)?.as_str() {
             Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into())
+            None => Err("ERR wrong type of path value".into()),
         }
     }
 
     pub fn arr_len(&self, path: &str) -> Result<usize, Error> {
         match self.get_doc(path)?.as_array() {
             Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into())
+            None => Err("ERR wrong type of path value".into()),
         }
     }
 
     pub fn obj_len(&self, path: &str) -> Result<usize, Error> {
         match self.get_doc(path)?.as_object() {
             Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into())
+            None => Err("ERR wrong type of path value".into()),
         }
     }
 
@@ -120,37 +120,36 @@ impl RedisJSON {
         }
     }
 
-    pub fn num_op<F: Fn(f64, f64) -> f64>(&mut self, path: &str, number: f64, fun: F) -> Result<String, Error> {
+    pub fn num_op<F: Fn(f64, f64) -> f64>(
+        &mut self,
+        path: &str,
+        number: f64,
+        fun: F,
+    ) -> Result<String, Error> {
         let current_data = mem::replace(&mut self.data, Value::Null);
-        let mut error= String::new();
-        let mut result : f64 = 0.0;
-        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| {
-            match v {
-                Value::Number(curr) => {
-                    match curr.as_f64() {
-                        Some(curr_value) => {
-                            result = fun(curr_value, number);
-                            match Number::from_f64(result) {
-                                Some(new_value) => {
-                                    Value::Number(new_value)
-                                },
-                                None => {
-                                    error.push_str("ERR can not represent result as Number");
-                                    v.clone()
-                                }
-                            }
-                        },
+        let mut error = String::new();
+        let mut result: f64 = 0.0;
+        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| match v {
+            Value::Number(curr) => match curr.as_f64() {
+                Some(curr_value) => {
+                    result = fun(curr_value, number);
+                    match Number::from_f64(result) {
+                        Some(new_value) => Value::Number(new_value),
                         None => {
-                            error.push_str("ERR can not convert current value as f64");
+                            error.push_str("ERR can not represent result as Number");
                             v.clone()
                         }
                     }
-                },
-                _ => {
-                    error.push_str("ERR wrong type of path value - expected a number but found ");
-                    error.push_str(RedisJSON::value_name(&v));
+                }
+                None => {
+                    error.push_str("ERR can not convert current value as f64");
                     v.clone()
                 }
+            },
+            _ => {
+                error.push_str("ERR wrong type of path value - expected a number but found ");
+                error.push_str(RedisJSON::value_name(&v));
+                v.clone()
             }
         })?;
         if error.is_empty() {
@@ -164,7 +163,7 @@ impl RedisJSON {
         let results = jsonpath_lib::select(&self.data, path)?;
         match results.first() {
             Some(s) => Ok(s),
-            None => Ok(&Value::Null)
+            None => Ok(&Value::Null),
         }
     }
 }
