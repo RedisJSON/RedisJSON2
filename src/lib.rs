@@ -169,7 +169,8 @@ fn json_num_powby(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_num_op(ctx, args, |num1, num2| num1.powf(num2))
 }
 
-fn json_num_op<F: Fn(f64, f64) -> f64>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult {
+fn json_num_op<F>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult
+    where F: Fn(f64, f64) -> f64 {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;

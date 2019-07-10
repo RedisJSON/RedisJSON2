@@ -127,35 +127,36 @@ impl RedisJSON {
         fun: F,
     ) -> Result<String, Error> {
         let current_data = mem::replace(&mut self.data, Value::Null);
-        let mut error = String::new();
+
+        let mut errors = vec![];
         let mut result: f64 = 0.0;
-        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| match v {
-            Value::Number(curr) => match curr.as_f64() {
-                Some(curr_value) => {
+
+        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| {
+            if let Value::Number(curr) = v {
+                if let Some(curr_value) = curr.as_f64() {
                     result = fun(curr_value, number);
-                    match Number::from_f64(result) {
-                        Some(new_value) => Value::Number(new_value),
-                        None => {
-                            error.push_str("ERR can not represent result as Number");
-                            v.clone()
-                        }
+
+                    if let Some(new_value) = Number::from_f64(result) {
+                        Value::Number(new_value)
+                    } else {
+                        errors.push("ERR can not represent result as Number".to_string());
+                        v.clone()
                     }
-                }
-                None => {
-                    error.push_str("ERR can not convert current value as f64");
+                } else {
+                    errors.push("ERR can not convert current value as f64".to_string());
                     v.clone()
                 }
-            },
-            _ => {
-                error.push_str("ERR wrong type of path value - expected a number but found ");
-                error.push_str(RedisJSON::value_name(&v));
+            } else {
+                errors.push(format!("ERR wrong type of path value - expected a number but found {}",
+                                       RedisJSON::value_name(&v)));
                 v.clone()
             }
         })?;
-        if error.is_empty() {
+
+        if errors.is_empty() {
             Ok(result.to_string())
         } else {
-            Err(error.into())
+            Err(errors.join("\n").into())
         }
     }
 
