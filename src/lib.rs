@@ -1,12 +1,12 @@
 #[macro_use]
 extern crate redismodule;
 
-use redismodule::{Context, RedisResult, NextArg, REDIS_OK, RedisError};
 use redismodule::native_types::RedisType;
+use redismodule::{Context, NextArg, RedisError, RedisResult, REDIS_OK};
 
 mod redisjson;
 
-use crate::redisjson::{RedisJSON, Error};
+use crate::redisjson::{Error, RedisJSON};
 
 static REDIS_JSON_TYPE: RedisType = RedisType::new("RedisJSON");
 
@@ -41,7 +41,7 @@ fn json_del(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key_writable(&key);
     let deleted = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.delete_path(&path)?,
-        None => 0
+        None => 0,
     };
     Ok(deleted.into())
 }
@@ -53,13 +53,12 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let path = backward_path(args.next_string()?);
     let value = args.next_string()?;
 
-    let set_option = args.next()
-        .map(|op| {
-            match op.to_uppercase().as_str() {
-                "NX" => Ok(SetOptions::NotExists),
-                "XX" => Ok(SetOptions::AlreadyExists),
-                _ => Err(RedisError::Str("ERR syntax error")),
-            }
+    let set_option = args
+        .next()
+        .map(|op| match op.to_uppercase().as_str() {
+            "NX" => Ok(SetOptions::NotExists),
+            "XX" => Ok(SetOptions::AlreadyExists),
+            _ => Err(RedisError::Str("ERR syntax error")),
         })
         .transpose()?;
 
@@ -89,7 +88,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut path = loop {
         let arg = match args.next_string() {
             Ok(s) => s,
-            Err(_) => "$".to_owned() // path is optional
+            Err(_) => "$".to_owned(), // path is optional
         };
 
         match arg.as_str() {
@@ -106,14 +105,13 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.to_string(&path)?.into(),
-        None => ().into()
+        None => ().into(),
     };
 
     Ok(value)
 }
 
 fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
-
     if args.len() < 3 {
         return Err(RedisError::WrongArity);
     }
@@ -126,17 +124,15 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
                 Some(doc) => {
                     let result = doc.to_string(&path)?;
                     results.push(result);
-                },
+                }
                 None => {}
             };
-
         }
         Ok(results.into())
     } else {
         Err(RedisError::WrongArity)
     }
 }
-
 
 fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
@@ -147,7 +143,7 @@ fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let length = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.str_len(&path)?.into(),
-        None => ().into()
+        None => ().into(),
     };
 
     Ok(length)
@@ -162,36 +158,37 @@ fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.get_type(&path)?.into(),
-        None => ().into()
+        None => ().into(),
     };
 
     Ok(value)
 }
 
 fn json_num_incrby(ctx: &Context, args: Vec<String>) -> RedisResult {
-    json_num_op(ctx, args, |num1, num2| {num1+num2})
+    json_num_op(ctx, args, |num1, num2| num1 + num2)
 }
 
 fn json_num_multby(ctx: &Context, args: Vec<String>) -> RedisResult {
-    json_num_op(ctx, args, |num1, num2| {num1*num2})
+    json_num_op(ctx, args, |num1, num2| num1 * num2)
 }
 
 fn json_num_powby(ctx: &Context, args: Vec<String>) -> RedisResult {
-    json_num_op(ctx, args, |num1, num2| {num1.powf(num2)})
+    json_num_op(ctx, args, |num1, num2| num1.powf(num2))
 }
 
-fn json_num_op<F: Fn(f64, f64) -> f64>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult {
+fn json_num_op<F>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult
+    where F: Fn(f64, f64) -> f64 {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = args.next_string()?;
     let number: f64 = args.next_string()?.parse()?;
 
     let key = ctx.open_key_writable(&key);
 
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => Ok(doc.num_op(&path, number, fun)?.into()),
-        None => Err("ERR could not perform this operation on a key that doesn't exist".into())
+        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
     }
 }
 
@@ -212,7 +209,7 @@ fn json_arr_insert(_ctx: &Context, _args: Vec<String>) -> RedisResult {
 }
 
 fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
-    json_len(ctx, args, | doc, path| doc.arr_len(path))
+    json_len(ctx, args, |doc, path| doc.arr_len(path))
 }
 
 fn json_arr_pop(_ctx: &Context, _args: Vec<String>) -> RedisResult {
@@ -228,10 +225,14 @@ fn json_obj_keys(_ctx: &Context, _args: Vec<String>) -> RedisResult {
 }
 
 fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
-    json_len(ctx, args, | doc, path| doc.obj_len(path))
+    json_len(ctx, args, |doc, path| doc.obj_len(path))
 }
 
 fn json_debug(_ctx: &Context, _args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
+fn json_forget(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
@@ -239,16 +240,20 @@ fn json_resp(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult {
+fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(
+    ctx: &Context,
+    args: Vec<String>,
+    fun: F,
+) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = args.next_string()?;
 
     let key = ctx.open_key_writable(&key);
 
     let length = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => fun(&doc, &path)?.into(),
-        None => ().into()
+        None => ().into(),
     };
 
     Ok(length)
@@ -268,21 +273,21 @@ redis_module! {
         ["json.mget", json_mget, ""],
         ["json.set", json_set, "write"],
         ["json.type", json_type, ""],
-        ["json.numincrby", json_num_incrby, "write"],
-        ["json.nummultby", json_num_multby, "write"],
-        ["json.numpowby", json_num_powby, "write"],
-        ["json.strappend", json_str_append, "write"],
+        ["json.numincrby", json_num_incrby, ""],
+        ["json.nummultby", json_num_multby, ""],
+        ["json.numpowby", json_num_powby, ""],
+        ["json.strappend", json_str_append, ""],
         ["json.strlen", json_str_len, ""],
-        ["json.arrappend", json_arr_append, "write"],
+        ["json.arrappend", json_arr_append, ""],
         ["json.arrindex", json_arr_index, ""],
-        ["json.arrinsert", json_arr_insert, "write"],
+        ["json.arrinsert", json_arr_insert, ""],
         ["json.arrlen", json_arr_len, ""],
-        ["json.arrpop", json_arr_pop, "write"],
-        ["json.arrtrim", json_arr_trim, "write"],
+        ["json.arrpop", json_arr_pop, ""],
+        ["json.arrtrim", json_arr_trim, ""],
         ["json.objkeys", json_obj_keys, ""],
         ["json.objlen", json_obj_len, ""],
         ["json.debug", json_debug, ""],
-        ["json.forget", json_del, "write"],
+        ["json.forget", json_forget, ""],
         ["json.resp", json_resp, ""],
     ],
 }
