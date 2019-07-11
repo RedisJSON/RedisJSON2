@@ -92,11 +92,11 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
         };
 
         match arg.as_str() {
-            "INDENT" => args.next(), // TODO add support
+            "INDENT" => args.next(),  // TODO add support
             "NEWLINE" => args.next(), // TODO add support
-            "SPACE" => args.next(), // TODO add support
-            "NOESCAPE" => continue, // TODO add support
-            _ => break arg
+            "SPACE" => args.next(),   // TODO add support
+            "NOESCAPE" => continue,   // TODO add support
+            _ => break arg,
         };
     };
     path = backward_path(path);
@@ -117,8 +117,8 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
     }
     if let Some(path) = args.last() {
         let path = backward_path(path.to_string());
-        let mut results: Vec<String> = Vec::with_capacity(args.len()-2);
-        for key in &args[1..args.len()-1] {
+        let mut results: Vec<String> = Vec::with_capacity(args.len() - 2);
+        for key in &args[1..args.len() - 1] {
             let redis_key = ctx.open_key_writable(&key);
             match redis_key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
                 Some(doc) => {
@@ -177,7 +177,9 @@ fn json_num_powby(ctx: &Context, args: Vec<String>) -> RedisResult {
 }
 
 fn json_num_op<F>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult
-    where F: Fn(f64, f64) -> f64 {
+where
+    F: Fn(f64, f64) -> f64,
+{
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
