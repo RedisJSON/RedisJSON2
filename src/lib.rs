@@ -185,19 +185,19 @@ fn json_num_op<F>(ctx: &Context, args: Vec<String>, fun: F) -> RedisResult
     }
 }
 
-fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_str_append(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_arr_append(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_arr_index(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_arr_insert(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
@@ -205,15 +205,15 @@ fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_len(ctx, args, |doc, path| doc.arr_len(path))
 }
 
-fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_arr_pop(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_arr_trim(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_obj_keys(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_obj_keys(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
@@ -221,15 +221,15 @@ fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_len(ctx, args, |doc, path| doc.obj_len(path))
 }
 
-fn json_debug(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_debug(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_forget(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_forget(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
+fn json_resp(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
