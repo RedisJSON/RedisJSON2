@@ -3,6 +3,7 @@ extern crate redismodule;
 
 use redismodule::native_types::RedisType;
 use redismodule::{Context, NextArg, RedisError, RedisResult, REDIS_OK};
+use serde_json::{Number, Value};
 
 mod redisjson;
 
@@ -158,18 +159,7 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
 }
 
 fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
-    let mut args = args.into_iter().skip(1);
-    let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
-
-    let key = ctx.open_key(&key);
-
-    let length = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => doc.str_len(&path)?.into(),
-        None => ().into(),
-    };
-
-    Ok(length)
+    json_len(ctx, args, |doc, path| doc.str_len(path))
 }
 
 fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
@@ -206,31 +196,169 @@ where
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = args.next_string()?;
+    let path = backward_path(args.next_string()?);
     let number: f64 = args.next_string()?.parse()?;
 
     let key = ctx.open_key_writable(&key);
 
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => Ok(doc.num_op(&path, number, fun)?.into()),
+        Some(doc) => Ok(doc
+            .value_op(&path, |value| {
+                if let Value::Number(curr) = value {
+                    if let Some(curr_value) = curr.as_f64() {
+                        let res = fun(curr_value, number);
+                        if let Some(new_value) = Number::from_f64(res) {
+                            Ok(Value::Number(new_value))
+                        } else {
+                            Err("ERR can not represent result as Number".into())
+                        }
+                    } else {
+                        Err("ERR can not convert current value as f64".into())
+                    }
+                } else {
+                    Err(format!(
+                        "ERR wrong type of path value - expected a number but found {}",
+                        RedisJSON::value_name(&value)
+                    ).into())
+                }
+            })?
+            .into()),
         None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
     }
 }
 
-fn json_str_append(_ctx: &Context, _args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+
+///
+/// JSON.STRAPPEND <key> [path] <json-string>
+///
+fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
+    let mut args = args.into_iter().skip(1);
+
+    let key = args.next_string()?;
+    let mut path  = "$".to_string();
+    let mut json = args.next_string()?;
+
+    // path is optional
+    if let Ok(val) = args.next_string() {
+        path = backward_path(json);
+        json = val;
+    }
+
+    let key = ctx.open_key_writable(&key);
+
+    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => Ok(doc
+            .value_op(&path, |value| {
+                if let Value::String(curr) = value {
+                        let mut res = curr.clone();
+                        res.push_str(json.as_str());
+                        Ok(Value::String(res))
+                } else {
+                    Err(format!(
+                        "ERR wrong type of path value - expected a string but found {}",
+                        RedisJSON::value_name(&value)
+                    ).into())
+                }
+            })?
+            .into()),
+        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
+    }
 }
 
-fn json_arr_append(_ctx: &Context, _args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+///
+/// JSON.ARRAPPEND <key> <path> <json> [json ...]
+///
+fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
+    let mut args = args.into_iter().skip(1);
+
+    let key = args.next_string()?;
+    let path = backward_path(args.next_string()?);
+    let mut json = args.next_string()?;
+
+    let key = ctx.open_key_writable(&key);
+
+    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => Ok(doc
+            .value_op(&path, |value| {
+                if let Value::Array(curr) = value {
+                    let mut res = curr.clone();
+
+                    loop {
+                        let value  = serde_json::from_str(json.as_str())?;
+                        res.push(value);
+
+                        // path is optional
+                        if let Ok(val) = args.next_string() {
+                            json = val;
+                        } else {
+                            break;
+                        }
+                    }
+                    Ok(Value::Array(res))
+                } else {
+                    Err(format!(
+                        "ERR wrong type of path value - expected a string but found {}",
+                        RedisJSON::value_name(&value)
+                    ).into())
+                }
+            })?
+            .into()),
+        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
+    }
 }
 
+///
+/// JSON.ARRINDEX <key> <path> <json-scalar> [start [stop]]
+///
 fn json_arr_index(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
-fn json_arr_insert(_ctx: &Context, _args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+///
+/// JSON.ARRINSERT <key> <path> <index> <json> [json ...]
+///
+fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
+    let mut args = args.into_iter().skip(1);
+
+    let key = args.next_string()?;
+    let path = backward_path(args.next_string()?);
+    let mut index : usize = args.next_string()?.parse()?;
+    let mut json = args.next_string()?;
+
+    let key = ctx.open_key_writable(&key);
+
+    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => Ok(doc
+            .value_op(&path, |value| {
+                if let Value::Array(curr) = value {
+                    if index >= curr.len() {
+                        Err("ERR index out of bounds".into())
+                    } else {
+                        let mut res = curr.clone();
+
+                        loop {
+                            let value = serde_json::from_str(json.as_str())?;
+                            res.insert(index, value);
+                            index = index + 1;
+                            // path is optional
+                            if let Ok(val) = args.next_string() {
+                                json = val;
+                            } else {
+                                break;
+                            }
+                        }
+                        Ok(Value::Array(res))
+                    }
+                } else {
+                    Err(format!(
+                        "ERR wrong type of path value - expected a string but found {}",
+                        RedisJSON::value_name(&value)
+                    ).into())
+                }
+            })?
+            .into()),
+        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
+    }
 }
 
 fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
@@ -240,8 +368,46 @@ fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 ///
 /// JSON.ARRPOP <key> [path [index]]
 ///
-fn json_arr_pop(_ctx: &Context, _args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
+    let mut args = args.into_iter().skip(1);
+
+    let key = args.next_string()?;
+    let mut index : usize = std::usize::MAX;
+    let mut path = "$".to_string();
+    if let Ok(p) = args.next_string() {
+        path = p;
+        if let Ok(i) = args.next_string() {
+            index = i.parse()?;
+        }
+    }
+
+    let key = ctx.open_key_writable(&key);
+
+    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => Ok(doc
+            .value_op(&path, |value| {
+                if let Value::Array(curr) = value {
+                    if index == std::usize::MAX {
+                        index = curr.len() - 1;
+                    }
+
+                    if index >= curr.len() {
+                        Err("ERR index out of bounds".into())
+                    } else {
+                        let mut res = curr.clone();
+                        res.remove(index);
+                        Ok(Value::Array(res))
+                    }
+                } else {
+                    Err(format!(
+                        "ERR wrong type of path value - expected a array but found {}",
+                        RedisJSON::value_name(&value)
+                    ).into())
+                }
+            })?
+            .into()),
+        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
+    }
 }
 
 fn json_arr_trim(_ctx: &Context, _args: Vec<String>) -> RedisResult {

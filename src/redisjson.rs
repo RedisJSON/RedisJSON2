@@ -4,7 +4,7 @@
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
 use jsonpath_lib::JsonPathError;
-use serde_json::{Number, Value};
+use serde_json::Value;
 use std::mem;
 
 pub struct Error {
@@ -122,7 +122,7 @@ impl RedisJSON {
         Ok(s.to_string())
     }
 
-    fn value_name(value: &Value) -> &str {
+    pub fn value_name(value: &Value) -> &str {
         match value {
             Value::Null => "null",
             Value::Bool(_) => "boolean",
@@ -133,22 +133,19 @@ impl RedisJSON {
         }
     }
 
-    pub fn num_op<F: Fn(f64, f64) -> f64>(
+    pub fn value_op<F: FnMut(&Value) -> Result<Value, Error>>(
         &mut self,
         path: &str,
-        number: f64,
-        fun: F,
+        mut fun: F,
     ) -> Result<String, Error> {
         let current_data = mem::replace(&mut self.data, Value::Null);
 
         let mut errors = vec![];
-        let mut result: f64 = 0.0;
+        let mut result = String::new(); // TODO handle case where path not found
 
-        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| match apply_op(
-            v, number, &fun,
-        ) {
-            Ok((res, new_value)) => {
-                result = res;
+        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| match fun(v) {
+            Ok(new_value) => {
+                result = new_value.to_string();
                 new_value
             }
             Err(e) => {
@@ -156,10 +153,14 @@ impl RedisJSON {
                 v.clone()
             }
         })?;
-        if errors.is_empty() {
-            Ok(result.to_string())
+        let err_len = errors.len();
+        if err_len == 0 {
+            Ok(result)
+        } else if err_len == 1 {
+            Err(errors.remove(0))
         } else {
-            Err(errors.join("\n").into())
+            let errors_string = errors.iter().map(|e| e.msg.to_string()).collect::<String>();
+            Err(errors_string.into())
         }
     }
 
@@ -169,29 +170,5 @@ impl RedisJSON {
             Some(s) => Ok(s),
             None => Err("ERR path does not exist".into()),
         }
-    }
-}
-
-fn apply_op<F>(v: &Value, number: f64, fun: F) -> Result<(f64, Value), String>
-where
-    F: Fn(f64, f64) -> f64,
-{
-    if let Value::Number(curr) = v {
-        if let Some(curr_value) = curr.as_f64() {
-            let res = fun(curr_value, number);
-
-            if let Some(new_value) = Number::from_f64(res) {
-                Ok((res, Value::Number(new_value)))
-            } else {
-                Err("ERR can not represent result as Number".to_string())
-            }
-        } else {
-            Err("ERR can not convert current value as f64".to_string())
-        }
-    } else {
-        Err(format!(
-            "ERR wrong type of path value - expected a number but found {}",
-            RedisJSON::value_name(&v)
-        ))
     }
 }
