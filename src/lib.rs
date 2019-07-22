@@ -94,13 +94,13 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
 
 ///
 /// JSON.GET <key>
-//         [INDENT indentation-string]
-//         [NEWLINE line-break-string]
-//         [SPACE space-string]
-//         [NOESCAPE]
-//         [path ...]
+///         [INDENT indentation-string]
+///         [NEWLINE line-break-string]
+///         [SPACE space-string]
+///         [NOESCAPE]
+///         [path ...]
 ///
-// TODO add support for multi path
+/// TODO add support for multi path
 fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
