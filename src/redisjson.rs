@@ -5,7 +5,7 @@
 // It can be operated on (e.g. INCR) and serialized back to JSON.
 use jsonpath_lib::JsonPathError;
 use serde_json::Value;
-use std::mem;
+use std::cmp;
 
 pub struct Error {
     msg: String,
@@ -65,7 +65,7 @@ impl RedisJSON {
             Ok(())
         } else {
             let mut replaced = false;
-            let current_data = mem::replace(&mut self.data, Value::Null);
+            let current_data = self.data.take();
             self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
                 replaced = true;
                 json.clone()
@@ -79,7 +79,7 @@ impl RedisJSON {
     }
 
     pub fn delete_path(&mut self, path: &str) -> Result<usize, Error> {
-        let current_data = mem::replace(&mut self.data, Value::Null);
+        let current_data = self.data.take();
 
         let mut deleted = 0;
         self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| {
@@ -117,6 +117,33 @@ impl RedisJSON {
         }
     }
 
+    pub fn arr_index(
+        &self,
+        path: &str,
+        scalar: &str,
+        start: usize,
+        end: usize,
+    ) -> Result<i64, Error> {
+        if let Value::Array(arr) = self.get_doc(path)? {
+            match serde_json::from_str(scalar)? {
+                Value::Array(_) | Value::Object(_) => Ok(-1),
+                v => {
+                    let mut start = cmp::max(start, 0);
+                    let end = cmp::min(end, arr.len());
+                    start = cmp::min(end, start);
+
+                    let slice = &arr[start..end];
+                    match slice.iter().position(|r| r == &v) {
+                        Some(i) => Ok(i as i64),
+                        None => Ok(-1),
+                    }
+                }
+            }
+        } else {
+            Ok(-1)
+        }
+    }
+
     pub fn get_type(&self, path: &str) -> Result<String, Error> {
         let s = RedisJSON::value_name(self.get_doc(path)?);
         Ok(s.to_string())
@@ -138,7 +165,7 @@ impl RedisJSON {
         path: &str,
         mut fun: F,
     ) -> Result<String, Error> {
-        let current_data = mem::replace(&mut self.data, Value::Null);
+        let current_data = self.data.take();
 
         let mut errors = vec![];
         let mut result = String::new(); // TODO handle case where path not found

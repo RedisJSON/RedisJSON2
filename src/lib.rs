@@ -4,6 +4,7 @@ extern crate redismodule;
 use redismodule::native_types::RedisType;
 use redismodule::{Context, NextArg, RedisError, RedisResult, REDIS_OK};
 use serde_json::{Number, Value};
+use std::usize;
 
 mod redisjson;
 
@@ -219,14 +220,14 @@ where
                     Err(format!(
                         "ERR wrong type of path value - expected a number but found {}",
                         RedisJSON::value_name(&value)
-                    ).into())
+                    )
+                    .into())
                 }
             })?
             .into()),
         None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
     }
 }
-
 
 ///
 /// JSON.STRAPPEND <key> [path] <json-string>
@@ -235,7 +236,7 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let mut path  = "$".to_string();
+    let mut path = "$".to_string();
     let mut json = args.next_string()?;
 
     // path is optional
@@ -250,14 +251,15 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
         Some(doc) => Ok(doc
             .value_op(&path, |value| {
                 if let Value::String(curr) = value {
-                        let mut res = curr.clone();
-                        res.push_str(json.as_str());
-                        Ok(Value::String(res))
+                    let mut res = curr.clone();
+                    res.push_str(json.as_str());
+                    Ok(Value::String(res))
                 } else {
                     Err(format!(
                         "ERR wrong type of path value - expected a string but found {}",
                         RedisJSON::value_name(&value)
-                    ).into())
+                    )
+                    .into())
                 }
             })?
             .into()),
@@ -284,7 +286,7 @@ fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
                     let mut res = curr.clone();
 
                     loop {
-                        let value  = serde_json::from_str(json.as_str())?;
+                        let value = serde_json::from_str(json.as_str())?;
                         res.push(value);
 
                         // path is optional
@@ -299,7 +301,8 @@ fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
                     Err(format!(
                         "ERR wrong type of path value - expected a string but found {}",
                         RedisJSON::value_name(&value)
-                    ).into())
+                    )
+                    .into())
                 }
             })?
             .into()),
@@ -310,8 +313,38 @@ fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
 ///
 /// JSON.ARRINDEX <key> <path> <json-scalar> [start [stop]]
 ///
-fn json_arr_index(_ctx: &Context, _args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+/// scalar - number, string, Boolean (true or false), or null
+///
+fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
+    let args_len = args.len();
+    if args_len < 4 {
+        return Err(RedisError::WrongArity);
+    }
+
+    let mut args = args.into_iter().skip(1);
+    let key = args.next_string()?;
+    let path = backward_path(args.next_string()?);
+    let json_scalar = args.next_string()?;
+
+    let start: usize = if args_len >= 5 {
+        args.next_string()?.parse()?
+    } else {
+        0
+    };
+
+    let end: usize = if args_len >= 6 {
+        args.next_string()?.parse()?
+    } else {
+        usize::MAX
+    };
+
+    let key = ctx.open_key(&key);
+    let index: i64 = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => doc.arr_index(&path, &json_scalar, start, end)?,
+        None => -1,
+    };
+
+    Ok(index.into())
 }
 
 ///
@@ -322,7 +355,7 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = args.next_string()?;
     let path = backward_path(args.next_string()?);
-    let mut index : usize = args.next_string()?.parse()?;
+    let mut index: usize = args.next_string()?.parse()?;
     let mut json = args.next_string()?;
 
     let key = ctx.open_key_writable(&key);
@@ -353,7 +386,8 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
                     Err(format!(
                         "ERR wrong type of path value - expected a string but found {}",
                         RedisJSON::value_name(&value)
-                    ).into())
+                    )
+                    .into())
                 }
             })?
             .into()),
@@ -372,7 +406,7 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let mut index : usize = std::usize::MAX;
+    let mut index: usize = usize::MAX;
     let mut path = "$".to_string();
     if let Ok(p) = args.next_string() {
         path = p;
@@ -387,7 +421,7 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
         Some(doc) => Ok(doc
             .value_op(&path, |value| {
                 if let Value::Array(curr) = value {
-                    if index == std::usize::MAX {
+                    if index == usize::MAX {
                         index = curr.len() - 1;
                     }
 
@@ -402,7 +436,8 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
                     Err(format!(
                         "ERR wrong type of path value - expected a array but found {}",
                         RedisJSON::value_name(&value)
-                    ).into())
+                    )
+                    .into())
                 }
             })?
             .into()),
