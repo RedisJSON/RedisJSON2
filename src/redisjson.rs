@@ -136,7 +136,7 @@ impl RedisJSON {
                 Value::Array(_) | Value::Object(_) => Ok(-1),
                 v => {
                     let mut start = cmp::max(start, 0);
-                    let end = cmp::min(end, arr.len());
+                    let end = cmp::min(end, arr.len() - 1);
                     start = cmp::min(end, start);
 
                     let slice = &arr[start..end];

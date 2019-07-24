@@ -4,7 +4,7 @@ extern crate redismodule;
 use redismodule::native_types::RedisType;
 use redismodule::{Context, NextArg, RedisError, RedisResult, REDIS_OK};
 use serde_json::{Number, Value};
-use std::{cmp, usize};
+use std::{cmp, usize, i64};
 
 mod redisjson;
 
@@ -434,15 +434,15 @@ fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let (path, mut index) = if let Ok(mut p) = args.next_string() {
+    let (path, mut index) : (String, i64) = if let Ok(mut p) = args.next_string() {
         p = backward_path(p);
         if let Ok(i) = args.next_string() {
             (p, i.parse()?)
         } else {
-            (p, usize::MAX)
+            (p, i64::MAX)
         }
     } else {
-        ("$".to_string(), usize::MAX)
+        ("$".to_string(), i64::MAX)
     };
 
     let key = ctx.open_key_writable(&key);
@@ -452,14 +452,15 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
             let mut res = Value::Null;
             doc.value_op(&path, |value| {
                 if let Value::Array(curr) = value {
-                    if index == usize::MAX {
-                        index = curr.len() - 1;
+                    index = cmp::min(index, curr.len() as i64 - 1);
+                    if index < 0 {
+                        index = curr.len() as i64 + index;
                     }
-                    if index >= curr.len() {
+                    if index >= curr.len() as i64 || index < 0{
                         Err("ERR index out of bounds".into())
                     } else {
                         let mut curr_clone = curr.clone();
-                        res = curr_clone.remove(index);
+                        res = curr_clone.remove(index as usize);
                         Ok(Value::Array(curr_clone))
                     }
                 } else {
@@ -494,7 +495,7 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
             .value_op(&path, |value| {
                 if let Value::Array(curr) = value {
                     start = cmp::max(start, 0);
-                    stop = cmp::min(stop, curr.len());
+                    stop = cmp::min(stop, curr.len()-1);
                     start = cmp::min(stop, start);
                     let res = &curr[start..stop];
                     Ok(Value::Array(res.to_vec()))
