@@ -447,8 +447,9 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key_writable(&key);
 
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => Ok(doc
-            .value_op(&path, |value| {
+        Some(doc) => {
+            let mut res = Value::Null;
+            doc.value_op(&path, |value| {
                 if let Value::Array(curr) = value {
                     if index == usize::MAX {
                         index = curr.len() - 1;
@@ -456,9 +457,9 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
                     if index >= curr.len() {
                         Err("ERR index out of bounds".into())
                     } else {
-                        let mut res = curr.clone();
-                        res.remove(index);
-                        Ok(Value::Array(res))
+                        let mut curr_clone = curr.clone();
+                        res = curr_clone.remove(index);
+                        Ok(Value::Array(curr_clone))
                     }
                 } else {
                     Err(format!(
@@ -467,8 +468,9 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
                     )
                     .into())
                 }
-            })?
-            .into()),
+            })?;
+            Ok(res.to_string().into())
+        }
         None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
     }
 }
