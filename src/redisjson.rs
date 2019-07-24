@@ -177,16 +177,31 @@ impl RedisJSON {
         let mut errors = vec![];
         let mut result = String::new(); // TODO handle case where path not found
 
-        self.data = jsonpath_lib::replace_with(current_data, path, &mut |v| match fun(v) {
-            Ok(new_value) => {
-                result = new_value.to_string();
-                new_value
+        self.data = if path == "$" {
+            // root needs special handling
+            match fun(&current_data) {
+                Ok(new_value) => {
+                    result = new_value.to_string();
+                    new_value
+                }
+                Err(e) => {
+                    errors.push(e);
+                    current_data
+                }
             }
-            Err(e) => {
-                errors.push(e);
-                v.clone()
-            }
-        })?;
+        } else {
+            jsonpath_lib::replace_with(current_data, path, &mut |v| match fun(v) {
+                Ok(new_value) => {
+                    result = new_value.to_string();
+                    new_value
+                }
+                Err(e) => {
+                    errors.push(e);
+                    v.clone()
+                }
+            })?
+        };
+
         let err_len = errors.len();
         if err_len == 0 {
             Ok(result)

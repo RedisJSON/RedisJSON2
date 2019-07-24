@@ -453,7 +453,6 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
                     if index == usize::MAX {
                         index = curr.len() - 1;
                     }
-
                     if index >= curr.len() {
                         Err("ERR index out of bounds".into())
                     } else {
@@ -536,6 +535,10 @@ fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 
 ///
 /// JSON.DEBUG <subcommand & arguments>
+///
+/// subcommands:
+/// MEMORY <key> [path]
+/// HELP
 ///
 fn json_debug(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
