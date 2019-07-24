@@ -141,7 +141,7 @@ impl RedisJSON {
 
                     let slice = &arr[start..end];
                     match slice.iter().position(|r| r == &v) {
-                        Some(i) => Ok(i as i64),
+                        Some(i) => Ok((start + i) as i64),
                         None => Ok(-1),
                     }
                 }
