@@ -34,6 +34,9 @@ fn backward_path(mut path: String) -> String {
     return path;
 }
 
+///
+/// JSON.DEL <key> [path]
+///
 fn json_del(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
@@ -55,6 +58,9 @@ fn json_del(ctx: &Context, args: Vec<String>) -> RedisResult {
     Ok(deleted.into())
 }
 
+///
+/// JSON.SET <key> <path> <json> [NX | XX]
+///
 fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
@@ -159,10 +165,16 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
     }
 }
 
+///
+/// JSON.STRLEN <key> [path]
+///
 fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_len(ctx, args, |doc, path| doc.str_len(path))
 }
 
+///
+/// JSON.TYPE <key> [path]
+///
 fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
@@ -178,14 +190,23 @@ fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
     Ok(value)
 }
 
+///
+/// JSON.NUMINCRBY <key> <path> <number>
+///
 fn json_num_incrby(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_num_op(ctx, args, |num1, num2| num1 + num2)
 }
 
+///
+/// JSON.NUMMULTBY <key> <path> <number>
+///
 fn json_num_multby(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_num_op(ctx, args, |num1, num2| num1 * num2)
 }
 
+///
+/// JSON.NUMPOWBY <key> <path> <number>
+///
 fn json_num_powby(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_num_op(ctx, args, |num1, num2| num1.powf(num2))
 }
@@ -400,6 +421,9 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
     }
 }
 
+///
+/// JSON.ARRLEN <key> [path]
+///
 fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_len(ctx, args, |doc, path| doc.arr_len(path))
 }
@@ -474,7 +498,7 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
                     Ok(Value::Array(res.to_vec()))
                 } else {
                     Err(format!(
-                        "ERR wrong type of path value - expected a arrray but found {}",
+                        "ERR wrong type of path value - expected a array but found {}",
                         RedisJSON::value_name(&value)
                     )
                     .into())
@@ -485,18 +509,41 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
     }
 }
 
-fn json_obj_keys(_ctx: &Context, _args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+///
+/// JSON.OBJKEYS <key> [path]
+///
+fn json_obj_keys(ctx: &Context, args: Vec<String>) -> RedisResult {
+    let mut args = args.into_iter().skip(1);
+    let key = args.next_string()?;
+    let path = backward_path(args.next_string()?);
+
+    let key = ctx.open_key(&key);
+
+    let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+        Some(doc) => doc.obj_keys(&path)?.into(),
+        None => ().into(),
+    };
+
+    Ok(value)
 }
 
+///
+/// JSON.OBJLEN <key> [path]
+///
 fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
     json_len(ctx, args, |doc, path| doc.obj_len(path))
 }
 
+///
+/// JSON.DEBUG <subcommand & arguments>
+///
 fn json_debug(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
 
+///
+/// JSON.RESP <key> [path]
+///
 fn json_resp(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }

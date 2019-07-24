@@ -117,6 +117,13 @@ impl RedisJSON {
         }
     }
 
+    pub fn obj_keys<'a>(&'a self, path: &'a str) -> Result<Vec<&'a String>, Error> {
+        match self.get_doc(path)?.as_object() {
+            Some(o) => Ok(o.keys().collect()),
+            None => Err("ERR wrong type of path value".into()),
+        }
+    }
+
     pub fn arr_index(
         &self,
         path: &str,
