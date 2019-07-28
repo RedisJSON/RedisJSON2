@@ -7,9 +7,10 @@ jobs:
 
     steps:
       - checkout
-      - run: git submodule sync
-      - run: git submodule update --init
-
+      - run:
+          name: Install Submodules
+          command: git -b cryptorelay-picks submodule add https://github.com/RedisLabsModules/redismodule-rs
+          
       - run:
           name: Install prerequisite
           command: sudo apt-get install -y clang
