@@ -4,9 +4,12 @@
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
 use jsonpath_lib::{JsonPathError, SelectorMut};
+use redismodule::raw;
 use serde_json::Value;
 use std::cmp;
+use std::os::raw::{c_int, c_void};
 
+#[derive(Debug)]
 pub struct Error {
     msg: String,
 }
@@ -230,4 +233,26 @@ impl RedisJSON {
             None => Err("ERR path does not exist".into()),
         }
     }
+}
+
+#[allow(non_snake_case, unused)]
+pub unsafe extern "C" fn json_rdb_load(rdb: *mut raw::RedisModuleIO, encver: c_int) -> *mut c_void {
+    if encver < 2 {
+        panic!("Can't load old RedisJSON RDB"); // TODO add support for backward
+    }
+    let json = RedisJSON::from_str(&raw::load_string(rdb)).unwrap();
+    Box::into_raw(Box::new(json)) as *mut c_void
+}
+
+#[allow(non_snake_case, unused)]
+#[no_mangle]
+pub unsafe extern "C" fn json_free(value: *mut c_void) {
+    Box::from_raw(value as *mut RedisJSON);
+}
+
+#[allow(non_snake_case, unused)]
+#[no_mangle]
+pub unsafe extern "C" fn json_rdb_save(rdb: *mut raw::RedisModuleIO, value: *mut c_void) {
+    let json = &*(value as *mut RedisJSON);
+    raw::save_string(rdb, &json.data.to_string());
 }

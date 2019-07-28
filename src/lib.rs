@@ -10,7 +10,25 @@ mod redisjson;
 
 use crate::redisjson::{Error, RedisJSON};
 
-static REDIS_JSON_TYPE: RedisType = RedisType::new("RedisJSON");
+static JSON_TYPE_ENCODING_VERSION: i32 = 2;
+static JSON_TYPE_NAME: &str = "ReJSON-RL";
+
+static REDIS_JSON_TYPE: RedisType = RedisType::new(
+    JSON_TYPE_NAME,
+    JSON_TYPE_ENCODING_VERSION,
+    raw::RedisModuleTypeMethods {
+        version: raw::REDISMODULE_TYPE_METHOD_VERSION as u64,
+
+        rdb_load: Some(redisjson::json_rdb_load),
+        rdb_save: Some(redisjson::json_rdb_save),
+        aof_rewrite: None, // TODO add support
+        free: Some(redisjson::json_free),
+
+        // Currently unused by Redis
+        mem_usage: None,
+        digest: None,
+    },
+);
 
 #[derive(Debug, PartialEq)]
 pub enum SetOptions {
@@ -284,14 +302,13 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
                         "ERR wrong type of path value - expected a string but found {}",
                         RedisJSON::value_name(&value)
                     )
-                        .into())
+                    .into())
                 }
             })?;
             Ok(res.into())
-        },
+        }
         None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
     }
-
 }
 
 ///
