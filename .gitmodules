@@ -1,4 +1,8 @@
 [submodule "redismodule-rs"]
-  path = redismodule-rs
-  url = https://github.com/RedisLabsModules/redismodule-rs
-  branch = cryptorelay-picks  
+        path = redismodule-rs
+        url = https://github.com/RedisLabsModules/redismodule-rs
+        branch = cryptorelay-picks  
+[submodule "RediSearch"]
+	path = RediSearch
+	url = git@github.com:RediSearch/RediSearch.git
+	branch = rust-api
