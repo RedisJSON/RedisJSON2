@@ -66,7 +66,7 @@ docs = {
     },
 }
 
-rmtest.config.REDIS_MODULE = '../../target/debug/libredisjson.so'
+rmtest.config.REDIS_MODULE = './target/debug/libredisjson.so'
 
 class BaseReJSONTest(BaseModuleTestCase):
     def getCacheInfo(self):
