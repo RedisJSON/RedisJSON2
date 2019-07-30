@@ -12,7 +12,7 @@ jobs:
       
       - run:
           name: Install prerequisite
-          command: sudo apt-get install -y clang pip
+          command: sudo apt-get install -y clang python-pip
 
       - run:
           name: Version information
