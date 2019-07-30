@@ -47,7 +47,9 @@ jobs:
       #            rustup run stable cargo build
       - run:
           name: Test
-          command: python ./test/pytest/test.py
+          command: |
+             pip install -r ./test/pytest/requirements.txt
+             python ./test/pytest/test.py
       #      - run:
       #          name: Upload Coverage
       #          command: ./scripts/codecov.sh
