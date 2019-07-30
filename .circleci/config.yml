@@ -62,6 +62,6 @@ jobs:
             - "~/.cargo"
             - "./target"
 
-      - run:
-          name: Run all tests
-          command: cargo test --all
+#      - run:
+#          name: Run all tests
+#          command: cargo test --all
