@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: 'redislabsmodules/rmbuilder:latest'
+      - image: circleci/rust
 
     steps:
       - checkout
@@ -12,9 +12,7 @@ jobs:
       
       - run:
           name: Install prerequisite
-          command: |
-             sudo curl https://sh.rustup.rs -sSf | sh
-             sudo apt-get install -y clang python-pip
+          command: sudo apt-get install -y clang python-pip redis-server
 
       - run:
           name: Version information
