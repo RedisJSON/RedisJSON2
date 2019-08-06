@@ -8,7 +8,7 @@ use std::{cmp, i64, usize};
 
 mod redisjson;
 
-use crate::redisjson::{Error, RedisJSON};
+use crate::redisjson::{Error, Format, RedisJSON};
 
 static JSON_TYPE_ENCODING_VERSION: i32 = 2;
 static JSON_TYPE_NAME: &str = "ReJSON-RL";
@@ -34,6 +34,7 @@ static REDIS_JSON_TYPE: RedisType = RedisType::new(
 pub enum SetOptions {
     NotExists,
     AlreadyExists,
+    None,
 }
 
 ///
@@ -86,27 +87,35 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let path = backward_path(args.next_string()?);
     let value = args.next_string()?;
 
-    let set_option = args
-        .next()
-        .map(|op| match op.to_uppercase().as_str() {
-            "NX" => Ok(SetOptions::NotExists),
-            "XX" => Ok(SetOptions::AlreadyExists),
-            _ => Err(RedisError::Str("ERR syntax error")),
-        })
-        .transpose()?;
+    let mut format = Format::JSON;
+    let mut set_option = SetOptions::None;
+    loop {
+        if let Some(s) = args.next() {
+            match s.as_str() {
+                "NX" => set_option = SetOptions::NotExists,
+                "XX" => set_option = SetOptions::AlreadyExists,
+                "FORMAT" => {
+                    format = Format::from_str(args.next_string()?.as_str())?;
+                }
+                _ => break,
+            };
+        } else {
+            break;
+        }
+    }
 
     let key = ctx.open_key_writable(&key);
     let current = key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?;
 
     match (current, set_option) {
-        (Some(_), Some(SetOptions::NotExists)) => Ok(().into()),
+        (Some(_), SetOptions::NotExists) => Ok(().into()),
         (Some(ref mut doc), _) => {
-            doc.set_value(&value, &path)?;
+            doc.set_value(&value, &path, format)?;
             REDIS_OK
         }
-        (None, Some(SetOptions::AlreadyExists)) => Ok(().into()),
+        (None, SetOptions::AlreadyExists) => Ok(().into()),
         (None, _) => {
-            let doc = RedisJSON::from_str(&value)?;
+            let doc = RedisJSON::from_str(&value, format)?;
             if path == "$" {
                 key.set_value(&REDIS_JSON_TYPE, doc)?;
                 REDIS_OK
@@ -128,29 +137,55 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
 /// TODO add support for multi path
 fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
-
     let key = args.next_string()?;
 
-    let mut path = loop {
+    let mut paths: Vec<String> = vec![];
+    let mut first_loop = true;
+    let mut format = Format::JSON;
+    loop {
         let arg = match args.next_string() {
             Ok(s) => s,
-            Err(_) => "$".to_owned(), // path is optional
+            Err(_) => {
+                // path is optional -> no path found on the first loop we use root "$"
+                if first_loop {
+                    paths.push("$".to_owned());
+                }
+                break;
+            }
         };
+        first_loop = false;
 
         match arg.as_str() {
-            "INDENT" => args.next(),  // TODO add support
-            "NEWLINE" => args.next(), // TODO add support
-            "SPACE" => args.next(),   // TODO add support
-            "NOESCAPE" => continue,   // TODO add support
-            _ => break arg,
+            "INDENT" => {
+                args.next();
+            } // TODO add support
+            "NEWLINE" => {
+                args.next();
+            } // TODO add support
+            "SPACE" => {
+                args.next();
+            } // TODO add support
+            "NOESCAPE" => {
+                continue;
+            } // TODO add support
+            "FORMAT" => {
+                format = Format::from_str(args.next_string()?.as_str())?;
+            }
+            _ => {
+                paths.push(backward_path(arg));
+            }
         };
-    };
-    path = backward_path(path);
+    }
 
     let key = ctx.open_key_writable(&key);
-
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => doc.to_string(&path)?.into(),
+        Some(doc) => if paths.len() == 1 {
+            doc.to_string(&paths[0], format)?
+        } else {
+            // can't be smaller than 1
+            doc.to_json(&mut paths)?
+        }
+        .into(),
         None => ().into(),
     };
 
@@ -171,7 +206,7 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
             let redis_key = ctx.open_key(&key);
             match redis_key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
                 Some(doc) => {
-                    let result = doc.to_string(&path)?;
+                    let result = doc.to_string(&path, Format::JSON)?;
                     results.push(Some(result));
                 }
                 None => {

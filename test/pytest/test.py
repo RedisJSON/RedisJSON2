@@ -66,7 +66,7 @@ docs = {
     },
 }
 
-rmtest.config.REDIS_MODULE = './target/debug/libredisjson.so'
+rmtest.config.REDIS_MODULE = '../../target/debug/libredisjson.so'
 
 class BaseReJSONTest(BaseModuleTestCase):
     def getCacheInfo(self):
@@ -169,50 +169,51 @@ class ReJSONTestCase(BaseReJSONTest):
             self.assertEqual(json.dumps(json.loads(
                 r.execute_command('JSON.GET', 'test'))), data)
 
-    # def testSetBehaviorModifyingSubcommands(self):
-    #     """Test JSON.SET's NX and XX subcommands"""
-    #
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         # test against the root
-    #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
-    #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
-    #
+    def testSetBehaviorModifyingSubcommands(self):
+        """Test JSON.SET's NX and XX subcommands"""
+
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+
+            # test against the root
+            self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
+            self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
+
+    # TODO uncomment
     #         # test an object key
     #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'XX'))
     #         self.assertOk(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'NX'))
     #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'NX'))
     #         self.assertOk(r.execute_command('JSON.SET', 'test', '.foo', '[1]', 'XX'))
     #
-    #         # verify failure for arrays
+    #         # verify failure for arrays             # TODO uncomment
     #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
     #             r.execute_command('JSON.SET', 'test', '.foo[1]', 'null', 'NX')
     #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
     #             r.execute_command('JSON.SET', 'test', '.foo[1]', 'null', 'XX')
-    #
-    # def testGetNonExistantPathsFromBasicDocumentShouldFail(self):
-    #     """Test failure of getting non-existing values"""
-    #
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         self.assertOk(r.execute_command('JSON.SET', 'test',
-    #                                         '.', json.dumps(docs['scalars'])))
-    #
-    #         # Paths that do not exist
-    #         paths = ['.foo', 'boo', '.key1[0]', '.key2.bar', '.key5[99]', '.key5["moo"]']
-    #         for p in paths:
-    #             with self.assertRaises(redis.exceptions.ResponseError) as cm:
-    #                 r.execute_command('JSON.GET', 'test', p)
-    #
-    #         # Test failure in multi-path get
-    #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
-    #             r.execute_command('JSON.GET', 'test', '.bool', paths[0])
+
+    def testGetNonExistantPathsFromBasicDocumentShouldFail(self):
+        """Test failure of getting non-existing values"""
+
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+
+            self.assertOk(r.execute_command('JSON.SET', 'test',
+                                            '.', json.dumps(docs['scalars'])))
+
+            # Paths that do not exist
+            paths = ['.foo', 'boo', '.key1[0]', '.key2.bar', '.key5[99]', '.key5["moo"]']
+            for p in paths:
+                with self.assertRaises(redis.exceptions.ResponseError) as cm:
+                    r.execute_command('JSON.GET', 'test', p)
+            # TODO uncomment
+            # # Test failure in multi-path get
+            # with self.assertRaises(redis.exceptions.ResponseError) as cm:
+            #     r.execute_command('JSON.GET', 'test', '.bool', paths[0])
 
     def testGetPartsOfValuesDocumentOneByOne(self):
         """Test type and value returned by JSON.GET"""
@@ -227,18 +228,28 @@ class ReJSONTestCase(BaseReJSONTest):
                 data = json.loads(r.execute_command('JSON.GET', 'test', '.{}'.format(k)))
                 self.assertEqual(str(type(data)), '<type \'{}\'>'.format(k), k)
                 self.assertEqual(data, v, k)
-    #
-    # def testGetPartsOfValuesDocumentMultiple(self):
-    #     """Test correctness of an object returned by JSON.GET"""
-    #
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         self.assertOk(r.execute_command('JSON.SET', 'test',
-    #                                         '.', json.dumps(docs['values'])))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', *docs['values'].keys()))
-    #         self.assertDictEqual(data, docs['values'])
+
+    def testGetPartsOfValuesDocumentMultiple(self):
+        """Test correctness of an object returned by JSON.GET"""
+
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+
+            self.assertOk(r.execute_command('JSON.SET', 'test',
+                                            '.', json.dumps(docs['values'])))
+            data = json.loads(r.execute_command('JSON.GET', 'test', *docs['values'].keys()))
+            # self.assertDictEqual(data, docs['values']) // TODO backward compatibility with JSONPATH "$.list" vs "list"
+
+
+    def testSetBSON(self):
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+            bson = open(os.path.join(json_path , 'bson_bytes_1.bson'), 'rb').read()
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', bson, 'FORMAT', 'BSON'))
+            data = json.loads(r.execute_command('JSON.GET', 'test', *docs['values'].keys()))
+
     #
     # def testMgetCommand(self):
     #     """Test REJSON.MGET command"""

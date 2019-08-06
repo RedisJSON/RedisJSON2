@@ -3,10 +3,12 @@
 // Translate between JSON and tree of Redis objects:
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
+use bson::decode_document;
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
 use serde_json::Value;
 use std::cmp;
+use std::io::Cursor;
 use std::os::raw::{c_int, c_void};
 
 #[derive(Debug)]
@@ -46,23 +48,56 @@ impl From<Error> for redismodule::RedisError {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Format {
+    JSON,
+    BSON,
+}
+
+impl Format {
+    pub fn from_str(s: &str) -> Result<Format, Error> {
+        match s {
+            "JSON" => Ok(Format::JSON),
+            "BSON" => Ok(Format::BSON),
+            _ => return Err("ERR wrong format".into()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct RedisJSON {
     data: Value,
 }
 
 impl RedisJSON {
-    pub fn from_str(data: &str) -> Result<Self, Error> {
-        // Parse the string of data into serde_json::Value.
-        let v: Value = serde_json::from_str(data)?;
-
-        Ok(Self { data: v })
+    pub fn parse_str(data: &str, format: Format) -> Result<Value, Error> {
+        let value: Value = match format {
+            Format::JSON => serde_json::from_str(data)?,
+            Format::BSON => match decode_document(&mut Cursor::new(data.as_bytes())) {
+                Ok(d) => {
+                    let mut iter = d.iter();
+                    if d.len() >= 1 {
+                        match iter.next() {
+                            Some((_, b)) => b.clone().into(),
+                            None => Value::Null,
+                        }
+                    } else {
+                        Value::Null
+                    }
+                }
+                Err(e) => return Err(e.to_string().into()),
+            },
+        };
+        Ok(value)
     }
 
-    pub fn set_value(&mut self, data: &str, path: &str) -> Result<(), Error> {
-        // Parse the string of data into serde_json::Value.
-        let json: Value = serde_json::from_str(data)?;
+    pub fn from_str(data: &str, format: Format) -> Result<Self, Error> {
+        let value = RedisJSON::parse_str(data, format)?;
+        Ok(Self { data: value })
+    }
 
+    pub fn set_value(&mut self, data: &str, path: &str, format: Format) -> Result<(), Error> {
+        let json: Value = RedisJSON::parse_str(data, format)?;
         if path == "$" {
             self.data = json;
             Ok(())
@@ -94,9 +129,37 @@ impl RedisJSON {
         Ok(deleted)
     }
 
-    pub fn to_string(&self, path: &str) -> Result<String, Error> {
+    pub fn to_string(&self, path: &str, format: Format) -> Result<String, Error> {
         let results = self.get_doc(path)?;
-        Ok(serde_json::to_string(&results)?)
+        let res = match format {
+            Format::JSON => serde_json::to_string(&results)?,
+            Format::BSON => return Err("Soon to come...".into()) //results.into() as Bson,
+        };
+        Ok(res)
+    }
+
+    pub fn to_json(&self, paths: &mut Vec<String>) -> Result<String, Error> {
+        let mut selector = jsonpath_lib::selector(&self.data);
+        let mut result = paths.drain(..).fold(String::from("{"), |mut acc, path| {
+            let value = match selector(&path) {
+                Ok(s) => match s.first() {
+                    Some(v) => v,
+                    None => &Value::Null,
+                },
+                Err(_) => &Value::Null,
+            };
+            acc.push('\"');
+            acc.push_str(&path);
+            acc.push_str("\":");
+            acc.push_str(value.to_string().as_str());
+            acc.push(',');
+            acc
+        });
+        if result.ends_with(",") {
+            result.pop();
+        }
+        result.push('}');
+        Ok(result.into())
     }
 
     pub fn str_len(&self, path: &str) -> Result<usize, Error> {
@@ -240,7 +303,7 @@ pub unsafe extern "C" fn json_rdb_load(rdb: *mut raw::RedisModuleIO, encver: c_i
     if encver < 2 {
         panic!("Can't load old RedisJSON RDB"); // TODO add support for backward
     }
-    let json = RedisJSON::from_str(&raw::load_string(rdb)).unwrap();
+    let json = RedisJSON::from_str(&raw::load_string(rdb), Format::JSON).unwrap();
     Box::into_raw(Box::new(json)) as *mut c_void
 }
 
