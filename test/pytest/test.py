@@ -8,7 +8,7 @@ import json
 import os
 
 # Path to JSON test case files
-json_path = os.path.abspath(os.path.join(os.getcwd(), '../files'))
+json_path = os.path.abspath(os.path.join(os.getcwd(), 'test/files'))
 
 # TODO: these are currently not supported so ignore them
 json_ignore = [
@@ -66,7 +66,7 @@ docs = {
     },
 }
 
-rmtest.config.REDIS_MODULE = '../../target/debug/libredisjson.so'
+rmtest.config.REDIS_MODULE = './target/debug/libredisjson.so'
 
 class BaseReJSONTest(BaseModuleTestCase):
     def getCacheInfo(self):
