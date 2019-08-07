@@ -164,7 +164,8 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
     if args.len() < 3 {
         return Err(RedisError::WrongArity);
     }
-    if let Some(path) = args.last() {
+
+    args.last().ok_or(RedisError::WrongArity).and_then(|path| {
         let path = backward_path(path.to_string());
         let keys = &args[1..args.len() - 1];
 
@@ -182,9 +183,7 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
             .collect();
 
         Ok(results?.into())
-    } else {
-        Err(RedisError::WrongArity)
-    }
+    })
 }
 
 ///
