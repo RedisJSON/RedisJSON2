@@ -2,7 +2,7 @@
 extern crate redismodule;
 
 use redismodule::native_types::RedisType;
-use redismodule::{Context, NextArg, RedisError, RedisResult, REDIS_OK};
+use redismodule::{Context, NextArg, RedisError, RedisResult, REDIS_OK, RedisValue};
 use serde_json::{Number, Value};
 use std::{cmp, i64, usize};
 
@@ -166,20 +166,21 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
     }
     if let Some(path) = args.last() {
         let path = backward_path(path.to_string());
-        let mut results: Vec<Option<String>> = Vec::with_capacity(args.len() - 2);
-        for key in &args[1..args.len() - 1] {
-            let redis_key = ctx.open_key(&key);
-            match redis_key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-                Some(doc) => {
-                    let result = doc.to_string(&path)?;
-                    results.push(Some(result));
-                }
-                None => {
-                    results.push(None);
-                }
-            };
-        }
-        Ok(results.into())
+        let keys = &args[1..args.len() - 1];
+
+        let results: Result<Vec<RedisValue>, RedisError> = keys.iter()
+            .map(|key| {
+                let result = ctx
+                    .open_key(key)
+                    .get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+                    .map(|doc| doc.to_string(&path))
+                    .transpose()?;
+
+                Ok(result.into())
+            })
+            .collect();
+
+        Ok(results?.into())
     } else {
         Err(RedisError::WrongArity)
     }
