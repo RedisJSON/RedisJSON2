@@ -2,7 +2,7 @@
 extern crate redismodule;
 
 use redismodule::native_types::RedisType;
-use redismodule::{Context, NextArg, RedisError, RedisResult, REDIS_OK, RedisValue};
+use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_OK};
 use serde_json::{Number, Value};
 use std::{cmp, i64, usize};
 
@@ -168,7 +168,8 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
         let path = backward_path(path.to_string());
         let keys = &args[1..args.len() - 1];
 
-        let results: Result<Vec<RedisValue>, RedisError> = keys.iter()
+        let results: Result<Vec<RedisValue>, RedisError> = keys
+            .iter()
             .map(|key| {
                 let result = ctx
                     .open_key(key)
