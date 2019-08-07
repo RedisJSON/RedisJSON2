@@ -244,31 +244,33 @@ where
 
     let key = ctx.open_key_writable(&key);
 
-    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => Ok(doc
-            .value_op(&path, |value| {
-                if let Value::Number(curr) = value {
-                    if let Some(curr_value) = curr.as_f64() {
+    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+        .ok_or_else(|| {
+            RedisError::Str("ERR could not perform this operation on a key that doesn't exist")
+        })
+        .and_then(|doc| {
+            doc.value_op(&path, |value| {
+                value
+                    .as_f64()
+                    .ok_or_else(|| number_err(value))
+                    .and_then(|curr_value| {
                         let res = fun(curr_value, number);
-                        if let Some(new_value) = Number::from_f64(res) {
-                            Ok(Value::Number(new_value))
-                        } else {
-                            Err("ERR can not represent result as Number".into())
-                        }
-                    } else {
-                        Err("ERR can not convert current value as f64".into())
-                    }
-                } else {
-                    Err(format!(
-                        "ERR wrong type of path value - expected a number but found {}",
-                        RedisJSON::value_name(&value)
-                    )
-                    .into())
-                }
-            })?
-            .into()),
-        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
-    }
+
+                        Number::from_f64(res)
+                            .ok_or(Error::from("ERR cannot represent result as Number"))
+                            .map(Value::Number)
+                    })
+            })
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+        })
+}
+
+fn number_err(value: &Value) -> Error {
+    Error::from(format!(
+        "ERR wrong type of path value - expected a number but found {}",
+        RedisJSON::value_name(value)
+    ))
 }
 
 ///
