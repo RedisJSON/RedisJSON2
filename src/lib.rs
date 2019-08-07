@@ -372,13 +372,13 @@ fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
     let path = backward_path(args.next_string()?);
     let json_scalar = args.next_string()?;
 
-    let start: usize = if args_len >= 5 {
+    let start = if args_len >= 5 {
         args.next_string()?.parse()?
     } else {
         0
     };
 
-    let end: usize = if args_len >= 6 {
+    let end = if args_len >= 6 {
         args.next_string()?.parse()?
     } else {
         usize::MAX
