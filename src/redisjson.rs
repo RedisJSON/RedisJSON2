@@ -220,7 +220,7 @@ impl RedisJSON {
         } else if err_len == 1 {
             Err(errors.remove(0))
         } else {
-            let errors_string = errors.iter().map(|e| e.msg.to_string()).collect::<String>();
+            let errors_string: String = errors.into_iter().map(|e| e.msg).collect();
             Err(errors_string.into())
         }
     }
