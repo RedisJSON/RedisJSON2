@@ -245,14 +245,12 @@ where
     let key = ctx.open_key_writable(&key);
 
     key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
-        .ok_or_else(|| {
-            RedisError::Str("ERR could not perform this operation on a key that doesn't exist")
-        })
+        .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
             doc.value_op(&path, |value| {
                 value
                     .as_f64()
-                    .ok_or_else(|| number_err(value))
+                    .ok_or_else(|| err_json(value, "number"))
                     .and_then(|curr_value| {
                         let res = fun(curr_value, number);
 
@@ -266,9 +264,10 @@ where
         })
 }
 
-fn number_err(value: &Value) -> Error {
+fn err_json(value: &Value, expected_value: &'static str) -> Error {
     Error::from(format!(
-        "ERR wrong type of path value - expected a number but found {}",
+        "ERR wrong type of path value - expected a {} but found {}",
+        expected_value,
         RedisJSON::value_name(value)
     ))
 }
@@ -291,27 +290,21 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = ctx.open_key_writable(&key);
 
-    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => {
-            let mut res = 0;
+    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+        .ok_or_else(RedisError::nonexistent_key)
+        .and_then(|doc| {
             doc.value_op(&path, |value| {
-                if let Value::String(curr) = value {
-                    let mut curr_clone = curr.clone();
-                    curr_clone.push_str(json.as_str());
-                    res = curr_clone.len();
-                    Ok(Value::String(curr_clone))
-                } else {
-                    Err(format!(
-                        "ERR wrong type of path value - expected a string but found {}",
-                        RedisJSON::value_name(&value)
-                    )
-                    .into())
-                }
-            })?;
-            Ok(res.into())
-        }
-        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
-    }
+                value
+                    .as_str()
+                    .ok_or_else(|| err_json(value, "string"))
+                    .and_then(|curr| {
+                        let new_value = [curr, &json].concat();
+                        Ok(Value::String(new_value))
+                    })
+            })
+            .map(|v| v.len().into())
+            .map_err(|e| e.into())
+        })
 }
 
 ///
