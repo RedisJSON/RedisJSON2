@@ -171,57 +171,49 @@ impl RedisJSON {
     }
 
     pub fn value_op<F>(&mut self, path: &str, mut fun: F) -> Result<String, Error>
-    where
-        F: FnMut(&Value) -> Result<Value, Error>,
+        where
+            F: FnMut(&Value) -> Result<Value, Error>,
     {
         let current_data = self.data.take();
 
         let mut errors = vec![];
         let mut result = String::new(); // TODO handle case where path not found
 
-        self.data = if path == "$" {
-            // root needs special handling
-            match fun(&current_data) {
-                Ok(new_value) => {
+        let mut collect_fun = |value: Value| {
+            fun(&value)
+                .map(|new_value| {
                     result = new_value.to_string();
                     new_value
-                }
-                Err(e) => {
+                })
+                .map_err(|e| {
                     errors.push(e);
-                    current_data
-                }
-            }
-        } else {
-            match SelectorMut::new().str_path(path) {
-                Err(e) => {
-                    errors.push(e.into());
-                    current_data
-                }
-                Ok(selector) => selector
-                    .value(current_data)
-                    .replace_with(&mut |v| match fun(v) {
-                        Ok(new_value) => {
-                            result = new_value.to_string();
-                            new_value
-                        }
-                        Err(e) => {
-                            errors.push(e);
-                            v.clone()
-                        }
-                    })?
-                    .take()
-                    .unwrap_or(Value::Null),
-            }
+                })
+                .unwrap_or(value)
         };
 
-        let err_len = errors.len();
-        if err_len == 0 {
-            Ok(result)
-        } else if err_len == 1 {
-            Err(errors.remove(0))
+        self.data = if path == "$" {
+            // root needs special handling
+            collect_fun(current_data)
         } else {
-            let errors_string: String = errors.into_iter().map(|e| e.msg).collect();
-            Err(errors_string.into())
+            SelectorMut::new()
+                .str_path(path)
+                .and_then(|selector| {
+                    Ok(selector
+                        .value(current_data.clone())
+                        .replace_with(&mut |v| collect_fun(v.to_owned()))?
+                        .take()
+                        .unwrap_or(Value::Null))
+                })
+                .map_err(|e| {
+                    errors.push(e.into());
+                })
+                .unwrap_or(current_data)
+        };
+
+        match errors.len() {
+            0 => Ok(result),
+            1 => Err(errors.remove(0)),
+            _ => Err(errors.into_iter().map(|e| e.msg).collect::<String>().into()),
         }
     }
 
