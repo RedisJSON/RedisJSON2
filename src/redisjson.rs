@@ -170,11 +170,10 @@ impl RedisJSON {
         }
     }
 
-    pub fn value_op<F: FnMut(&Value) -> Result<Value, Error>>(
-        &mut self,
-        path: &str,
-        mut fun: F,
-    ) -> Result<String, Error> {
+    pub fn value_op<F>(&mut self, path: &str, mut fun: F) -> Result<String, Error>
+    where
+        F: FnMut(&Value) -> Result<Value, Error>,
+    {
         let current_data = self.data.take();
 
         let mut errors = vec![];
