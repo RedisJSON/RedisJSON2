@@ -370,53 +370,51 @@ fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
 /// JSON.ARRINSERT <key> <path> <index> <json> [json ...]
 ///
 fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
-    let mut args = args.into_iter().skip(1);
+    let mut args = args.into_iter().skip(1).peekable();
 
     let key = args.next_string()?;
     let path = backwards_compat_path(args.next_string()?);
-    let mut index: i64 = args.next_string()?.parse()?;
-    let mut json = args.next_string()?;
+    let mut index = args.next_i64()?;
+
+    // We require at least one JSON item to append
+    args.peek().ok_or(RedisError::WrongArity)?;
 
     let key = ctx.open_key_writable(&key);
 
-    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => Ok(doc
-            .value_op(&path, |value| {
-                if let Value::Array(curr) = value {
-                    let len = curr.len() as i64;
-                    if i64::abs(index) >= len {
-                        Err("ERR index out of bounds".into())
-                    } else {
+    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+        .ok_or_else(RedisError::nonexistent_key)
+        .and_then(|doc| {
+            doc.value_op(&path, |value| {
+                value
+                    .as_array()
+                    .ok_or_else(|| err_json(value, "array"))
+                    .and_then(|curr| {
+                        let len = curr.len() as i64;
+
+                        if index.abs() >= len {
+                            return Err("ERR index out of bounds".into());
+                        }
+
                         if index < 0 {
                             index = len + index;
                         }
 
-                        let mut res = curr.clone();
+                        let index = index as usize;
 
-                        loop {
-                            let value = serde_json::from_str(json.as_str())?;
-                            res.insert(index as usize, value);
-                            index = index + 1;
-                            // path is optional
-                            if let Ok(val) = args.next_string() {
-                                json = val;
-                            } else {
-                                break;
-                            }
-                        }
-                        Ok(Value::Array(res))
-                    }
-                } else {
-                    Err(format!(
-                        "ERR wrong type of path value - expected a string but found {}",
-                        RedisJSON::value_name(&value)
-                    )
-                    .into())
-                }
-            })?
-            .into()),
-        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
-    }
+                        let items: Vec<Value> = args
+                            .clone()
+                            .map(|json| serde_json::from_str(&json))
+                            .collect::<Result<_, _>>()?;
+
+                        let mut new_value = curr.to_owned();
+                        new_value.splice(index..index, items.into_iter().rev());
+
+                        Ok(Value::Array(new_value))
+                    })
+            })
+            .map(|v| v.len().into())
+            .map_err(|e| e.into())
+        })
 }
 
 ///
