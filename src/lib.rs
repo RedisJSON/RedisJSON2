@@ -4,7 +4,7 @@ extern crate redismodule;
 use redismodule::native_types::RedisType;
 use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_OK};
 use serde_json::{Number, Value};
-use std::{cmp, i64, usize};
+use std::{i64, usize};
 
 mod redisjson;
 
@@ -506,31 +506,32 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = args.next_string()?;
     let path = backwards_compat_path(args.next_string()?);
-    let mut start: usize = args.next_string()?.parse()?;
-    let mut stop: usize = args.next_string()?.parse()?;
+    let start: usize = args.next_string()?.parse()?;
+    let stop: usize = args.next_string()?.parse()?;
 
     let key = ctx.open_key_writable(&key);
 
-    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => Ok(doc
-            .value_op(&path, |value| {
-                if let Value::Array(curr) = value {
-                    start = cmp::max(start, 0);
-                    stop = cmp::min(stop, curr.len() - 1);
-                    start = cmp::min(stop, start);
-                    let res = &curr[start..stop];
-                    Ok(Value::Array(res.to_vec()))
-                } else {
-                    Err(format!(
-                        "ERR wrong type of path value - expected a array but found {}",
-                        RedisJSON::value_name(&value)
-                    )
-                    .into())
-                }
-            })?
-            .into()),
-        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
-    }
+    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+        .ok_or_else(RedisError::nonexistent_key)
+        .and_then(|doc| {
+            doc.value_op(&path, |value| do_json_arr_trim(start, stop, &value))
+                .map(|v| v.len().into())
+                .map_err(|e| e.into())
+        })
+}
+
+fn do_json_arr_trim(mut start: usize, mut stop: usize, value: &Value) -> Result<Value, Error> {
+    value
+        .as_array()
+        .ok_or_else(|| err_json(value, "array"))
+        .and_then(|curr| {
+            start = start.max(0);
+            stop = stop.min(curr.len() - 1);
+            start = stop.min(start);
+
+            let res = &curr[start..stop];
+            Ok(Value::Array(res.to_vec()))
+        })
 }
 
 ///
