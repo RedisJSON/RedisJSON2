@@ -266,7 +266,7 @@ where
 
 fn err_json(value: &Value, expected_value: &'static str) -> Error {
     Error::from(format!(
-        "ERR wrong type of path value - expected a {} but found {}",
+        "ERR wrong type of path value - expected {} but found {}",
         expected_value,
         RedisJSON::value_name(value)
     ))
