@@ -464,35 +464,38 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
         .unwrap_or(("$".to_string(), i64::MAX));
 
     let key = ctx.open_key_writable(&key);
+    let mut res = Value::Null;
 
-    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => {
-            let mut res = Value::Null;
-            doc.value_op(&path, |value| {
-                if let Value::Array(curr) = value {
-                    index = cmp::min(index, curr.len() as i64 - 1);
-                    if index < 0 {
-                        index = curr.len() as i64 + index;
-                    }
-                    if index >= curr.len() as i64 || index < 0 {
-                        Err("ERR index out of bounds".into())
-                    } else {
-                        let mut curr_clone = curr.clone();
-                        res = curr_clone.remove(index as usize);
-                        Ok(Value::Array(curr_clone))
-                    }
-                } else {
-                    Err(format!(
-                        "ERR wrong type of path value - expected a array but found {}",
-                        RedisJSON::value_name(&value)
-                    )
-                    .into())
-                }
-            })?;
-            Ok(res.to_string().into())
-        }
-        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
-    }
+    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+        .ok_or_else(RedisError::nonexistent_key)
+        .and_then(|doc| {
+            doc.value_op(&path, |value| do_json_arr_pop(index, &mut res, value))
+                .map(|v| v.to_string().into())
+                .map_err(|e| e.into())
+        })
+}
+
+fn do_json_arr_pop(mut index: i64, res: &mut Value, value: &Value) -> Result<Value, Error> {
+    value
+        .as_array()
+        .ok_or_else(|| err_json(value, "array"))
+        .and_then(|curr| {
+            let len = curr.len() as i64;
+
+            index = index.min(len - 1);
+
+            if index < 0 {
+                index = len + index;
+            }
+
+            if index >= len || index < 0 {
+                return Err("ERR index out of bounds".into());
+            }
+
+            let mut new_value = curr.to_owned();
+            *res = new_value.remove(index as usize);
+            Ok(Value::Array(new_value))
+        })
 }
 
 ///
