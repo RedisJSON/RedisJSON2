@@ -170,8 +170,8 @@ impl RedisJSON {
     }
 
     pub fn value_op<F>(&mut self, path: &str, mut fun: F) -> Result<String, Error>
-        where
-            F: FnMut(&Value) -> Result<Value, Error>,
+    where
+        F: FnMut(&Value) -> Result<Value, Error>,
     {
         let current_data = self.data.take();
 
