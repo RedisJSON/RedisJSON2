@@ -247,20 +247,25 @@ where
     key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
-            doc.value_op(&path, |value| {
-                value
-                    .as_f64()
-                    .ok_or_else(|| err_json(value, "number"))
-                    .and_then(|curr_value| {
-                        let res = fun(curr_value, number);
+            doc.value_op(&path, |value| do_json_num_op(&fun, number, value))
+                .map(|v| v.into())
+                .map_err(|e| e.into())
+        })
+}
 
-                        Number::from_f64(res)
-                            .ok_or(Error::from("ERR cannot represent result as Number"))
-                            .map(Value::Number)
-                    })
-            })
-            .map(|v| v.into())
-            .map_err(|e| e.into())
+fn do_json_num_op<F>(fun: F, number: f64, value: &Value) -> Result<Value, Error>
+where
+    F: FnOnce(f64, f64) -> f64,
+{
+    value
+        .as_f64()
+        .ok_or_else(|| err_json(value, "number"))
+        .and_then(|curr_value| {
+            let res = fun(curr_value, number);
+
+            Number::from_f64(res)
+                .ok_or(Error::from("ERR cannot represent result as Number"))
+                .map(Value::Number)
         })
 }
 
