@@ -451,17 +451,17 @@ fn json_arr_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 ///
 fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
+
     let key = args.next_string()?;
-    let (path, mut index): (String, i64) = if let Ok(mut p) = args.next_string() {
-        p = backwards_compat_path(p);
-        if let Ok(i) = args.next_string() {
-            (p, i.parse()?)
-        } else {
-            (p, i64::MAX)
-        }
-    } else {
-        ("$".to_string(), i64::MAX)
-    };
+
+    let (path, index) = args
+        .next()
+        .map(|p| {
+            let path = backwards_compat_path(p);
+            let index = args.next_i64().unwrap_or(i64::MAX);
+            (path, index)
+        })
+        .unwrap_or(("$".to_string(), i64::MAX));
 
     let key = ctx.open_key_writable(&key);
 
