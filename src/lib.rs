@@ -298,17 +298,19 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
     key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
-            doc.value_op(&path, |value| {
-                value
-                    .as_str()
-                    .ok_or_else(|| err_json(value, "string"))
-                    .and_then(|curr| {
-                        let new_value = [curr, &json].concat();
-                        Ok(Value::String(new_value))
-                    })
-            })
-            .map(|v| v.len().into())
-            .map_err(|e| e.into())
+            doc.value_op(&path, |value| do_json_str_append(&json, value))
+                .map(|v| v.len().into())
+                .map_err(|e| e.into())
+        })
+}
+
+fn do_json_str_append(json: &String, value: &Value) -> Result<Value, Error> {
+    value
+        .as_str()
+        .ok_or_else(|| err_json(value, "string"))
+        .and_then(|curr| {
+            let new_value = [curr, &json].concat();
+            Ok(Value::String(new_value))
         })
 }
 
@@ -329,22 +331,26 @@ fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
     key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
-            doc.value_op(&path, |value| {
-                value
-                    .as_array()
-                    .ok_or_else(|| err_json(value, "array"))
-                    .and_then(|curr| {
-                        let items: Vec<Value> = args
-                            .clone()
-                            .map(|json| serde_json::from_str(&json))
-                            .collect::<Result<_, _>>()?;
+            doc.value_op(&path, |value| do_json_arr_append(args.clone(), value))
+                .map(|v| v.len().into())
+                .map_err(|e| e.into())
+        })
+}
 
-                        let new_value = [curr.as_slice(), &items].concat();
-                        Ok(Value::Array(new_value))
-                    })
-            })
-            .map(|v| v.len().into())
-            .map_err(|e| e.into())
+fn do_json_arr_append<I>(args: I, value: &Value) -> Result<Value, Error>
+where
+    I: Iterator<Item = String>,
+{
+    value
+        .as_array()
+        .ok_or_else(|| err_json(value, "array"))
+        .and_then(|curr| {
+            let items: Vec<Value> = args
+                .map(|json| serde_json::from_str(&json))
+                .collect::<Result<_, _>>()?;
+
+            let new_value = [curr.as_slice(), &items].concat();
+            Ok(Value::Array(new_value))
         })
 }
 
@@ -379,7 +385,7 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = args.next_string()?;
     let path = backwards_compat_path(args.next_string()?);
-    let mut index = args.next_i64()?;
+    let index = args.next_i64()?;
 
     // We require at least one JSON item to append
     args.peek().ok_or(RedisError::WrongArity)?;
@@ -390,35 +396,41 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
             doc.value_op(&path, |value| {
-                value
-                    .as_array()
-                    .ok_or_else(|| err_json(value, "array"))
-                    .and_then(|curr| {
-                        let len = curr.len() as i64;
-
-                        if index.abs() >= len {
-                            return Err("ERR index out of bounds".into());
-                        }
-
-                        if index < 0 {
-                            index = len + index;
-                        }
-
-                        let index = index as usize;
-
-                        let items: Vec<Value> = args
-                            .clone()
-                            .map(|json| serde_json::from_str(&json))
-                            .collect::<Result<_, _>>()?;
-
-                        let mut new_value = curr.to_owned();
-                        new_value.splice(index..index, items.into_iter().rev());
-
-                        Ok(Value::Array(new_value))
-                    })
+                do_json_arr_insert(args.clone(), index, value)
             })
             .map(|v| v.len().into())
             .map_err(|e| e.into())
+        })
+}
+
+fn do_json_arr_insert<I>(args: I, mut index: i64, value: &Value) -> Result<Value, Error>
+where
+    I: Iterator<Item = String>,
+{
+    value
+        .as_array()
+        .ok_or_else(|| err_json(value, "array"))
+        .and_then(|curr| {
+            let len = curr.len() as i64;
+
+            if index.abs() >= len {
+                return Err("ERR index out of bounds".into());
+            }
+
+            if index < 0 {
+                index = len + index;
+            }
+
+            let index = index as usize;
+
+            let items: Vec<Value> = args
+                .map(|json| serde_json::from_str(&json))
+                .collect::<Result<_, _>>()?;
+
+            let mut new_value = curr.to_owned();
+            new_value.splice(index..index, items.into_iter().rev());
+
+            Ok(Value::Array(new_value))
         })
 }
 
