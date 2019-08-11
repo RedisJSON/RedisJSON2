@@ -279,13 +279,18 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let mut path = "$".to_string();
-    let mut json = args.next_string()?;
+    let path_or_json = args.next_string()?;
+
+    let path;
+    let json;
 
     // path is optional
     if let Ok(val) = args.next_string() {
-        path = backwards_compat_path(json);
+        path = backwards_compat_path(path_or_json);
         json = val;
+    } else {
+        path = "$".to_string();
+        json = path_or_json;
     }
 
     let key = ctx.open_key_writable(&key);
