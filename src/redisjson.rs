@@ -6,7 +6,6 @@
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
 use serde_json::Value;
-use std::cmp;
 use std::os::raw::{c_int, c_void};
 
 #[derive(Debug)]
@@ -138,9 +137,9 @@ impl RedisJSON {
             match serde_json::from_str(scalar)? {
                 Value::Array(_) | Value::Object(_) => Ok(-1),
                 v => {
-                    let mut start = cmp::max(start, 0);
-                    let end = cmp::min(end, arr.len() - 1);
-                    start = cmp::min(end, start);
+                    let mut start = start.max(0);
+                    let end = end.min(arr.len() - 1);
+                    start = end.min(start);
 
                     let slice = &arr[start..end];
                     match slice.iter().position(|r| r == &v) {
