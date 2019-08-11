@@ -37,9 +37,9 @@ pub enum SetOptions {
 }
 
 ///
-/// backward compatibility convector for RedisJSON 1.x clients
+/// Backwards compatibility convertor for RedisJSON 1.x clients
 ///
-fn backward_path(mut path: String) -> String {
+fn backwards_compat_path(mut path: String) -> String {
     if !path.starts_with("$") {
         if path == "." {
             path.replace_range(..1, "$");
@@ -59,7 +59,7 @@ fn json_del(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
 
     let key = ctx.open_key_writable(&key);
     let deleted = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
@@ -83,7 +83,7 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
     let value = args.next_string()?;
 
     let set_option = args
@@ -145,7 +145,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
             _ => break arg,
         };
     };
-    path = backward_path(path);
+    path = backwards_compat_path(path);
 
     let key = ctx.open_key_writable(&key);
 
@@ -166,7 +166,7 @@ fn json_mget(ctx: &Context, args: Vec<String>) -> RedisResult {
     }
 
     args.last().ok_or(RedisError::WrongArity).and_then(|path| {
-        let path = backward_path(path.to_string());
+        let path = backwards_compat_path(path.to_string());
         let keys = &args[1..args.len() - 1];
 
         let results: Result<Vec<RedisValue>, RedisError> = keys
@@ -199,7 +199,7 @@ fn json_str_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
 
     let key = ctx.open_key(&key);
 
@@ -239,7 +239,7 @@ where
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
     let number: f64 = args.next_string()?.parse()?;
 
     let key = ctx.open_key_writable(&key);
@@ -284,7 +284,7 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     // path is optional
     if let Ok(val) = args.next_string() {
-        path = backward_path(json);
+        path = backwards_compat_path(json);
         json = val;
     }
 
@@ -314,7 +314,7 @@ fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1).peekable();
 
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
 
     // We require at least one JSON item to append
     args.peek().ok_or(RedisError::WrongArity)?;
@@ -356,7 +356,7 @@ fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
     let json_scalar = args.next_string()?;
 
     let start = if args_len >= 5 {
@@ -387,7 +387,7 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
     let mut index: i64 = args.next_string()?.parse()?;
     let mut json = args.next_string()?;
 
@@ -447,7 +447,7 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
     let (path, mut index): (String, i64) = if let Ok(mut p) = args.next_string() {
-        p = backward_path(p);
+        p = backwards_compat_path(p);
         if let Ok(i) = args.next_string() {
             (p, i.parse()?)
         } else {
@@ -496,7 +496,7 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
 
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
     let mut start: usize = args.next_string()?.parse()?;
     let mut stop: usize = args.next_string()?.parse()?;
 
@@ -530,7 +530,7 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
 fn json_obj_keys(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
 
     let key = ctx.open_key(&key);
 
@@ -574,7 +574,7 @@ fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(
 ) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
-    let path = backward_path(args.next_string()?);
+    let path = backwards_compat_path(args.next_string()?);
 
     let key = ctx.open_key(&key);
     let length = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
