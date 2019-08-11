@@ -349,33 +349,19 @@ fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
 /// scalar - number, string, Boolean (true or false), or null
 ///
 fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
-    let args_len = args.len();
-    if args_len < 4 {
-        return Err(RedisError::WrongArity);
-    }
-
     let mut args = args.into_iter().skip(1);
+
     let key = args.next_string()?;
     let path = backwards_compat_path(args.next_string()?);
     let json_scalar = args.next_string()?;
-
-    let start = if args_len >= 5 {
-        args.next_string()?.parse()?
-    } else {
-        0
-    };
-
-    let end = if args_len >= 6 {
-        args.next_string()?.parse()?
-    } else {
-        usize::MAX
-    };
+    let start = args.next().map(|v| v.parse()).unwrap_or(Ok(0))?;
+    let end = args.next().map(|v| v.parse()).unwrap_or(Ok(usize::MAX))?;
 
     let key = ctx.open_key(&key);
-    let index: i64 = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => doc.arr_index(&path, &json_scalar, start, end)?,
-        None => -1,
-    };
+
+    let index = key
+        .get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+        .map_or(Ok(-1), |doc| doc.arr_index(&path, &json_scalar, start, end))?;
 
     Ok(index.into())
 }
