@@ -311,44 +311,36 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
 /// JSON.ARRAPPEND <key> <path> <json> [json ...]
 ///
 fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
-    let mut args = args.into_iter().skip(1);
+    let mut args = args.into_iter().skip(1).peekable();
 
     let key = args.next_string()?;
     let path = backward_path(args.next_string()?);
-    let mut json = args.next_string()?;
+
+    // We require at least one JSON item to append
+    args.peek().ok_or(RedisError::WrongArity)?;
 
     let key = ctx.open_key_writable(&key);
 
-    match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => {
-            let mut res = 0;
+    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+        .ok_or_else(RedisError::nonexistent_key)
+        .and_then(|doc| {
             doc.value_op(&path, |value| {
-                if let Value::Array(curr) = value {
-                    let mut curr_clone = curr.clone();
-                    loop {
-                        let value = serde_json::from_str(json.as_str())?;
-                        curr_clone.push(value);
+                value
+                    .as_array()
+                    .ok_or_else(|| err_json(value, "array"))
+                    .and_then(|curr| {
+                        let items: Vec<Value> = args
+                            .clone()
+                            .map(|json| serde_json::from_str(&json))
+                            .collect::<Result<_, _>>()?;
 
-                        if let Ok(val) = args.next_string() {
-                            json = val;
-                        } else {
-                            break;
-                        }
-                    }
-                    res = curr_clone.len();
-                    Ok(Value::Array(curr_clone))
-                } else {
-                    Err(format!(
-                        "ERR wrong type of path value - expected a string but found {}",
-                        RedisJSON::value_name(&value)
-                    )
-                    .into())
-                }
-            })?;
-            Ok(res.into())
-        }
-        None => Err("ERR could not perform this operation on a key that doesn't exist".into()),
-    }
+                        let new_value = [curr.as_slice(), &items].concat();
+                        Ok(Value::Array(new_value))
+                    })
+            })
+            .map(|v| v.len().into())
+            .map_err(|e| e.into())
+        })
 }
 
 ///
