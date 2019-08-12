@@ -169,19 +169,19 @@ impl RedisJSON {
         }
     }
 
-    pub fn value_op<F>(&mut self, path: &str, mut fun: F) -> Result<String, Error>
+    pub fn value_op<F>(&mut self, path: &str, mut fun: F) -> Result<Value, Error>
     where
         F: FnMut(&Value) -> Result<Value, Error>,
     {
         let current_data = self.data.take();
 
         let mut errors = vec![];
-        let mut result = String::new(); // TODO handle case where path not found
+        let mut result = Value::Null; // TODO handle case where path not found
 
         let mut collect_fun = |value: Value| {
             fun(&value)
                 .map(|new_value| {
-                    result = new_value.to_string();
+                    result = new_value.clone();
                     new_value
                 })
                 .map_err(|e| {

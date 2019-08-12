@@ -248,7 +248,7 @@ where
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
             doc.value_op(&path, |value| do_json_num_op(&fun, number, value))
-                .map(|v| v.into())
+                .map(|v| v.to_string().into())
                 .map_err(|e| e.into())
         })
 }
@@ -304,7 +304,7 @@ fn json_str_append(ctx: &Context, args: Vec<String>) -> RedisResult {
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
             doc.value_op(&path, |value| do_json_str_append(&json, value))
-                .map(|v| v.len().into())
+                .map(|v| v.as_str().map_or(usize::MAX, |v| v.len()).into())
                 .map_err(|e| e.into())
         })
 }
@@ -337,7 +337,7 @@ fn json_arr_append(ctx: &Context, args: Vec<String>) -> RedisResult {
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
             doc.value_op(&path, |value| do_json_arr_append(args.clone(), value))
-                .map(|v| v.len().into())
+                .map(|v| v.as_array().map_or(usize::MAX, |v| v.len()).into())
                 .map_err(|e| e.into())
         })
 }
@@ -403,7 +403,7 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
             doc.value_op(&path, |value| {
                 do_json_arr_insert(args.clone(), index, value)
             })
-            .map(|v| v.len().into())
+            .map(|v| v.as_array().map_or(usize::MAX, |v| v.len()).into())
             .map_err(|e| e.into())
         })
 }
@@ -515,7 +515,7 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
             doc.value_op(&path, |value| do_json_arr_trim(start, stop, &value))
-                .map(|v| v.len().into())
+                .map(|v| v.as_array().map_or(usize::MAX, |v| v.len()).into())
                 .map_err(|e| e.into())
         })
 }
