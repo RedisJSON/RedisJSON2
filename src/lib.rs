@@ -373,6 +373,8 @@ fn json_arr_index(ctx: &Context, args: Vec<String>) -> RedisResult {
     let start = args.next().map(|v| v.parse()).unwrap_or(Ok(0))?;
     let end = args.next().map(|v| v.parse()).unwrap_or(Ok(usize::MAX))?;
 
+    args.done()?; // TODO: Add to other functions as well to terminate args list
+
     let key = ctx.open_key(&key);
 
     let index = key
