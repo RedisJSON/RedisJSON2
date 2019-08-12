@@ -418,7 +418,7 @@ where
         .and_then(|curr| {
             let len = curr.len() as i64;
 
-            if index.abs() >= len {
+            if !(-len..len).contains(&index) {
                 return Err("ERR index out of bounds".into());
             }
 
