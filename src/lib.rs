@@ -433,7 +433,7 @@ where
                 .collect::<Result<_, _>>()?;
 
             let mut new_value = curr.to_owned();
-            new_value.splice(index..index, items.into_iter().rev());
+            new_value.splice(index..index, items.into_iter());
 
             Ok(Value::Array(new_value))
         })
