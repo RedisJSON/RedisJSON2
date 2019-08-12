@@ -526,13 +526,15 @@ fn do_json_arr_trim(start: i64, stop: i64, value: &Value) -> Result<Value, Error
         .ok_or_else(|| err_json(value, "array"))
         .and_then(|curr| {
             let len = curr.len() as i64;
-
             let stop = stop.normalize(len);
-            let start = start.normalize(len).min(stop);
 
-            let (start, stop) = (start as usize, stop as usize);
+            let range = if start > len || start > stop as i64 {
+                0..0 // Return an empty array
+            } else {
+                start.normalize(len)..(stop + 1)
+            };
 
-            let res = &curr[start..=stop];
+            let res = &curr[range];
             Ok(Value::Array(res.to_vec()))
         })
 }
