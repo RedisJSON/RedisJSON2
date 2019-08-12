@@ -6,8 +6,10 @@ use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_O
 use serde_json::{Number, Value};
 use std::{i64, usize};
 
+mod index;
 mod redisjson;
 
+use crate::index::Index;
 use crate::redisjson::{Error, RedisJSON};
 
 static JSON_TYPE_ENCODING_VERSION: i32 = 2;
@@ -410,7 +412,7 @@ fn json_arr_insert(ctx: &Context, args: Vec<String>) -> RedisResult {
         })
 }
 
-fn do_json_arr_insert<I>(args: I, mut index: i64, value: &Value) -> Result<Value, Error>
+fn do_json_arr_insert<I>(args: I, index: i64, value: &Value) -> Result<Value, Error>
 where
     I: Iterator<Item = String>,
 {
@@ -424,11 +426,7 @@ where
                 return Err("ERR index out of bounds".into());
             }
 
-            if index < 0 {
-                index = len + index;
-            }
-
-            let index = index as usize;
+            let index = index.normalize(len);
 
             let items: Vec<Value> = args
                 .map(|json| serde_json::from_str(&json))
@@ -508,8 +506,8 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = args.next_string()?;
     let path = backwards_compat_path(args.next_string()?);
-    let start: usize = args.next_string()?.parse()?;
-    let stop: usize = args.next_string()?.parse()?;
+    let start = args.next_i64()?;
+    let stop = args.next_i64()?;
 
     let key = ctx.open_key_writable(&key);
 
@@ -522,16 +520,19 @@ fn json_arr_trim(ctx: &Context, args: Vec<String>) -> RedisResult {
         })
 }
 
-fn do_json_arr_trim(mut start: usize, mut stop: usize, value: &Value) -> Result<Value, Error> {
+fn do_json_arr_trim(start: i64, stop: i64, value: &Value) -> Result<Value, Error> {
     value
         .as_array()
         .ok_or_else(|| err_json(value, "array"))
         .and_then(|curr| {
-            start = start.max(0);
-            stop = stop.min(curr.len() - 1);
-            start = stop.min(start);
+            let len = curr.len() as i64;
 
-            let res = &curr[start..stop];
+            let stop = stop.normalize(len);
+            let start = start.normalize(len).min(stop);
+
+            let (start, stop) = (start as usize, stop as usize);
+
+            let res = &curr[start..=stop];
             Ok(Value::Array(res.to_vec()))
         })
 }
