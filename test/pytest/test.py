@@ -18,7 +18,7 @@ json_ignore = [
     'pass-json-parser-0007.json',   # UTF-8 to Unicode
     'pass-json-parser-0012.json',   # UTF-8 to Unicode
     'pass-jsonsl-1.json',           # big numbers
-    'pass-jsonsl-yelp.json',        # float percision
+    'pass-jsonsl-yelp.json',        # float precision
 ]
 
 # Some basic documents to use in the tests
@@ -425,7 +425,6 @@ class ReJSONTestCase(BaseReJSONTest):
 
             # TODO: Should not be needed once DEL works
             self.assertOk(r.execute_command('JSON.SET', 'test', '.', '["-inf", -1, null, 1, "+inf"]'))
-
 
             # Test trimming the array
             self.assertEqual(4, r.execute_command('JSON.ARRTRIM', 'test', '.', 1, -1))
