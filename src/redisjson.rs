@@ -8,12 +8,7 @@ use redismodule::raw;
 use serde_json::Value;
 use std::os::raw::{c_int, c_void};
 use bson::decode_document;
-use jsonpath_lib::{JsonPathError, SelectorMut};
-use redismodule::raw;
-use serde_json::Value;
-use std::cmp;
 use std::io::Cursor;
-use std::os::raw::{c_int, c_void};
 
 #[derive(Debug)]
 pub struct Error {

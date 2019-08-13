@@ -4,7 +4,7 @@ extern crate redismodule;
 use redismodule::native_types::RedisType;
 use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_OK};
 use serde_json::{Number, Value};
-use std::{cmp, i64, usize};
+use std::{i64, usize};
 
 mod index;
 mod redisjson;
