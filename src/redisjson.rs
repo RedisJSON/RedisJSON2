@@ -3,6 +3,10 @@
 // Translate between JSON and tree of Redis objects:
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
+use jsonpath_lib::{JsonPathError, SelectorMut};
+use redismodule::raw;
+use serde_json::Value;
+use std::os::raw::{c_int, c_void};
 use bson::decode_document;
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
@@ -201,11 +205,11 @@ impl RedisJSON {
             match serde_json::from_str(scalar)? {
                 Value::Array(_) | Value::Object(_) => Ok(-1),
                 v => {
-                    let mut start = cmp::max(start, 0);
-                    let end = cmp::min(end, arr.len() - 1);
-                    start = cmp::min(end, start);
+                    let mut start = start.max(0);
+                    let end = end.min(arr.len() - 1);
+                    start = end.min(start);
 
-                    let slice = &arr[start..end];
+                    let slice = &arr[start..=end];
                     match slice.iter().position(|r| r == &v) {
                         Some(i) => Ok((start + i) as i64),
                         None => Ok(-1),
@@ -233,59 +237,50 @@ impl RedisJSON {
         }
     }
 
-    pub fn value_op<F: FnMut(&Value) -> Result<Value, Error>>(
-        &mut self,
-        path: &str,
-        mut fun: F,
-    ) -> Result<String, Error> {
+    pub fn value_op<F>(&mut self, path: &str, mut fun: F) -> Result<Value, Error>
+    where
+        F: FnMut(&Value) -> Result<Value, Error>,
+    {
         let current_data = self.data.take();
 
         let mut errors = vec![];
-        let mut result = String::new(); // TODO handle case where path not found
+        let mut result = Value::Null; // TODO handle case where path not found
+
+        let mut collect_fun = |value: Value| {
+            fun(&value)
+                .map(|new_value| {
+                    result = new_value.clone();
+                    new_value
+                })
+                .map_err(|e| {
+                    errors.push(e);
+                })
+                .unwrap_or(value)
+        };
 
         self.data = if path == "$" {
             // root needs special handling
-            match fun(&current_data) {
-                Ok(new_value) => {
-                    result = new_value.to_string();
-                    new_value
-                }
-                Err(e) => {
-                    errors.push(e);
-                    current_data
-                }
-            }
+            collect_fun(current_data)
         } else {
-            match SelectorMut::new().str_path(path) {
-                Err(e) => {
+            SelectorMut::new()
+                .str_path(path)
+                .and_then(|selector| {
+                    Ok(selector
+                        .value(current_data.clone())
+                        .replace_with(&mut |v| collect_fun(v.to_owned()))?
+                        .take()
+                        .unwrap_or(Value::Null))
+                })
+                .map_err(|e| {
                     errors.push(e.into());
-                    current_data
-                }
-                Ok(selector) => selector
-                    .value(current_data)
-                    .replace_with(&mut |v| match fun(v) {
-                        Ok(new_value) => {
-                            result = new_value.to_string();
-                            new_value
-                        }
-                        Err(e) => {
-                            errors.push(e);
-                            v.clone()
-                        }
-                    })?
-                    .take()
-                    .unwrap_or(Value::Null),
-            }
+                })
+                .unwrap_or(current_data)
         };
 
-        let err_len = errors.len();
-        if err_len == 0 {
-            Ok(result)
-        } else if err_len == 1 {
-            Err(errors.remove(0))
-        } else {
-            let errors_string = errors.iter().map(|e| e.msg.to_string()).collect::<String>();
-            Err(errors_string.into())
+        match errors.len() {
+            0 => Ok(result),
+            1 => Err(errors.remove(0)),
+            _ => Err(errors.into_iter().map(|e| e.msg).collect::<String>().into()),
         }
     }
 

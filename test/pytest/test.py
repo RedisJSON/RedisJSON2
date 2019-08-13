@@ -249,7 +249,6 @@ class ReJSONTestCase(BaseReJSONTest):
             bson = open(os.path.join(json_path , 'bson_bytes_1.bson'), 'rb').read()
             self.assertOk(r.execute_command('JSON.SET', 'test', '.', bson, 'FORMAT', 'BSON'))
             data = json.loads(r.execute_command('JSON.GET', 'test', *docs['values'].keys()))
-
     #
     # def testMgetCommand(self):
     #     """Test REJSON.MGET command"""
@@ -374,118 +373,122 @@ class ReJSONTestCase(BaseReJSONTest):
     #         self.assertEqual(1, r.execute_command('JSON.DEL', 'test', '.'))
     #         self.assertIsNone(r.execute_command('JSON.GET', 'test', '.'))
     #
-    # def testArrayCRUD(self):
-    #     """Test JSON Array CRUDness"""
-    #
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         # Test creation of an empty array
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.', '[]'))
-    #         self.assertEqual('array', r.execute_command('JSON.TYPE', 'test', '.'))
-    #         self.assertEqual(0, r.execute_command('JSON.ARRLEN', 'test', '.'))
-    #
-    #         # Test failure of setting an element at different positons in an empty array
-    #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
-    #             r.execute_command('JSON.SET', 'test', '[0]', 0)
-    #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
-    #             r.execute_command('JSON.SET', 'test', '[19]', 0)
-    #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
-    #             r.execute_command('JSON.SET', 'test', '[-1]', 0)
-    #
-    #         # Test appending and inserting elements to the array
-    #         self.assertEqual(1, r.execute_command('JSON.ARRAPPEND', 'test', '.', 1))
-    #         self.assertEqual(1, r.execute_command('JSON.ARRLEN', 'test', '.'))
-    #         self.assertEqual(2, r.execute_command('JSON.ARRINSERT', 'test', '.', 0, -1))
-    #         self.assertEqual(2, r.execute_command('JSON.ARRLEN', 'test', '.'))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([-1, 1, ], data)
-    #         self.assertEqual(3, r.execute_command('JSON.ARRINSERT', 'test', '.', -1, 0))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([-1, 0, 1, ], data)
-    #         self.assertEqual(5, r.execute_command('JSON.ARRINSERT', 'test', '.', -3, -3, -2))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([-3, -2, -1, 0, 1, ], data)
-    #         self.assertEqual(7, r.execute_command('JSON.ARRAPPEND', 'test', '.', 2, 3))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([-3, -2, -1, 0, 1, 2, 3], data)
-    #
-    #         # Test replacing elements in the array
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '[0]', '"-inf"'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '[-1]', '"+inf"'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '[3]', 'null'))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([u'-inf', -2, -1, None, 1, 2, u'+inf'], data)
-    #
-    #         # Test deleting from the array
-    #         self.assertEqual(1, r.execute_command('JSON.DEL', 'test', '[1]'))
-    #         self.assertEqual(1, r.execute_command('JSON.DEL', 'test', '[-2]'))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([u'-inf', -1, None, 1, u'+inf'], data)
-    #
-    #         # Test trimming the array
-    #         self.assertEqual(4, r.execute_command('JSON.ARRTRIM', 'test', '.', 1, -1))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([-1, None, 1, u'+inf'], data)
-    #         self.assertEqual(3, r.execute_command('JSON.ARRTRIM', 'test', '.', 0, -2))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([-1, None, 1], data)
-    #         self.assertEqual(1, r.execute_command('JSON.ARRTRIM', 'test', '.', 1, 1))
-    #         data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
-    #         self.assertListEqual([None], data)
-    #
-    #         # Test replacing the array
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.', '[true]'))
-    #         self.assertEqual('array', r.execute_command('JSON.TYPE', 'test', '.'))
-    #         self.assertEqual(1, r.execute_command('JSON.ARRLEN', 'test', '.'))
-    #         self.assertEqual('true', r.execute_command('JSON.GET', 'test', '[0]'))
-    #
-    # def testArrIndexCommand(self):
-    #     """Test JSON.ARRINDEX command"""
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         self.assertOk(r.execute_command('JSON.SET', 'test',
-    #                                         '.', '{ "arr": [0, 1, 2, 3, 2, 1, 0] }'))
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0), 0)
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 3), 3)
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 4), -1)
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 1), 6)
-    #         # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, -1), 6)
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 6), 6)
-    #         # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 4, -0), 6)
-    #         # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 5, -1), -1)
-    #         # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 2, -2, 6), -1)
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', '"foo"'), -1)
-    #
-    #         # self.assertEqual(r.execute_command('JSON.ARRINSERT', 'test', '.arr', 4, '[4]'), 8)
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 3), 3)
-    #         self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 2, 3), 4)
-    #         # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', '[4]'), -1)
-    #
-    # def testArrTrimCommand(self):
-    #     """Test JSON.ARRTRIM command"""
-    #
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         self.assertOk(r.execute_command('JSON.SET', 'test',
-    #                                         '.', '{ "arr": [0, 1, 2, 3, 2, 1, 0] }'))
-    #         self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 1, -2), 5)
-    #         self.assertListEqual(json.loads(r.execute_command(
-    #             'JSON.GET', 'test', '.arr')), [1, 2, 3, 2, 1])
-    #         self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 0, 99), 5)
-    #         self.assertListEqual(json.loads(r.execute_command(
-    #             'JSON.GET', 'test', '.arr')), [1, 2, 3, 2, 1])
-    #         self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 0, 2), 3)
-    #         self.assertListEqual(json.loads(r.execute_command(
-    #             'JSON.GET', 'test', '.arr')), [1, 2, 3])
-    #         self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 99, 2), 0)
-    #         self.assertListEqual(json.loads(r.execute_command('JSON.GET', 'test', '.arr')), [])
-    #
+    def testArrayCRUD(self):
+        """Test JSON Array CRUDness"""
+
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+
+            # Test creation of an empty array
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '[]'))
+            self.assertEqual('array', r.execute_command('JSON.TYPE', 'test', '.'))
+            self.assertEqual(0, r.execute_command('JSON.ARRLEN', 'test', '.'))
+
+            # Test failure of setting an element at different positons in an empty array
+            with self.assertRaises(redis.exceptions.ResponseError) as cm:
+                r.execute_command('JSON.SET', 'test', '[0]', 0)
+            with self.assertRaises(redis.exceptions.ResponseError) as cm:
+                r.execute_command('JSON.SET', 'test', '[19]', 0)
+            with self.assertRaises(redis.exceptions.ResponseError) as cm:
+                r.execute_command('JSON.SET', 'test', '[-1]', 0)
+
+            # Test appending and inserting elements to the array
+            self.assertEqual(1, r.execute_command('JSON.ARRAPPEND', 'test', '.', 1))
+            self.assertEqual(1, r.execute_command('JSON.ARRLEN', 'test', '.'))
+            self.assertEqual(2, r.execute_command('JSON.ARRINSERT', 'test', '.', 0, -1))
+            self.assertEqual(2, r.execute_command('JSON.ARRLEN', 'test', '.'))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([-1, 1, ], data)
+            self.assertEqual(3, r.execute_command('JSON.ARRINSERT', 'test', '.', -1, 0))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([-1, 0, 1, ], data)
+            self.assertEqual(5, r.execute_command('JSON.ARRINSERT', 'test', '.', -3, -3, -2))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([-3, -2, -1, 0, 1, ], data)
+            self.assertEqual(7, r.execute_command('JSON.ARRAPPEND', 'test', '.', 2, 3))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([-3, -2, -1, 0, 1, 2, 3], data)
+
+            # Test replacing elements in the array
+            self.assertOk(r.execute_command('JSON.SET', 'test', '[0]', '"-inf"'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '[-1]', '"+inf"'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '[3]', 'null'))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([u'-inf', -2, -1, None, 1, 2, u'+inf'], data)
+
+            # # Test deleting from the array
+            # self.assertEqual(1, r.execute_command('JSON.DEL', 'test', '[1]'))
+            # self.assertEqual(1, r.execute_command('JSON.DEL', 'test', '[-2]'))
+            # data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            # self.assertListEqual([u'-inf', -1, None, 1, u'+inf'], data)
+
+            # TODO: Should not be needed once DEL works
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '["-inf", -1, null, 1, "+inf"]'))
+
+
+            # Test trimming the array
+            self.assertEqual(4, r.execute_command('JSON.ARRTRIM', 'test', '.', 1, -1))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([-1, None, 1, u'+inf'], data)
+            self.assertEqual(3, r.execute_command('JSON.ARRTRIM', 'test', '.', 0, -2))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([-1, None, 1], data)
+            self.assertEqual(1, r.execute_command('JSON.ARRTRIM', 'test', '.', 1, 1))
+            data = json.loads(r.execute_command('JSON.GET', 'test', '.'))
+            self.assertListEqual([None], data)
+
+            # Test replacing the array
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '[true]'))
+            self.assertEqual('array', r.execute_command('JSON.TYPE', 'test', '.'))
+            self.assertEqual(1, r.execute_command('JSON.ARRLEN', 'test', '.'))
+            self.assertEqual('true', r.execute_command('JSON.GET', 'test', '[0]'))
+
+    def testArrIndexCommand(self):
+        """Test JSON.ARRINDEX command"""
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+
+            self.assertOk(r.execute_command('JSON.SET', 'test',
+                                            '.', '{ "arr": [0, 1, 2, 3, 2, 1, 0] }'))
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0), 0)
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 3), 3)
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 4), -1)
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 1), 6)
+            # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, -1), 6)
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 6), 6)
+            # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 4, -0), 6)
+            # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 0, 5, -1), -1)
+            # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 2, -2, 6), -1)
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', '"foo"'), -1)
+
+            # self.assertEqual(r.execute_command('JSON.ARRINSERT', 'test', '.arr', 4, '[4]'), 8)
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 3), 3)
+            self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', 2, 3), 4)
+            # self.assertEqual(r.execute_command('JSON.ARRINDEX', 'test', '.arr', '[4]'), -1)
+
+    def testArrTrimCommand(self):
+        """Test JSON.ARRTRIM command"""
+
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+
+            self.assertOk(r.execute_command('JSON.SET', 'test',
+                                            '.', '{ "arr": [0, 1, 2, 3, 2, 1, 0] }'))
+            self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 1, -2), 5)
+            self.assertListEqual(json.loads(r.execute_command(
+                'JSON.GET', 'test', '.arr')), [1, 2, 3, 2, 1])
+            self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 0, 99), 5)
+            self.assertListEqual(json.loads(r.execute_command(
+                'JSON.GET', 'test', '.arr')), [1, 2, 3, 2, 1])
+            self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 0, 2), 3)
+            self.assertListEqual(json.loads(r.execute_command(
+                'JSON.GET', 'test', '.arr')), [1, 2, 3])
+            self.assertEqual(r.execute_command('JSON.ARRTRIM', 'test', '.arr', 99, 2), 0)
+            self.assertListEqual(json.loads(r.execute_command('JSON.GET', 'test', '.arr')), [])
+
     # def testArrPopCommand(self):
     #     """Test JSON.ARRPOP command"""
     #
@@ -611,18 +614,18 @@ class ReJSONTestCase(BaseReJSONTest):
     #         self.assertEqual(84, res['bar'])
     #
     #
-    # def testStrCommands(self):
-    #     """Test JSON.STRAPPEND and JSON.STRLEN commands"""
-    #
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.', '"foo"'))
-    #         self.assertEqual('string', r.execute_command('JSON.TYPE', 'test', '.'))
-    #         self.assertEqual(3, r.execute_command('JSON.STRLEN', 'test', '.'))
-    #         self.assertEqual(6, r.execute_command('JSON.STRAPPEND', 'test', '.', 'bar'))
-    #         self.assertEqual('"foobar"', r.execute_command('JSON.GET', 'test', '.'))
+    def testStrCommands(self):
+        """Test JSON.STRAPPEND and JSON.STRLEN commands"""
+
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '"foo"'))
+            self.assertEqual('string', r.execute_command('JSON.TYPE', 'test', '.'))
+            self.assertEqual(3, r.execute_command('JSON.STRLEN', 'test', '.'))
+            self.assertEqual(6, r.execute_command('JSON.STRAPPEND', 'test', '.', 'bar'))
+            self.assertEqual('"foobar"', r.execute_command('JSON.GET', 'test', '.'))
     #
     # def testRespCommand(self):
     #     """Test JSON.RESP command"""
