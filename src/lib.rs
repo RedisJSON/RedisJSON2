@@ -589,13 +589,13 @@ fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key(&key);
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => Ok(scan(doc.get_doc(&path)?)),
-        None => Ok(().into())
+        None => Ok(().into()),
     }
 }
 
-fn scan(doc: &Value) -> RedisValue{
+fn scan(doc: &Value) -> RedisValue {
     match doc {
-        Value::Null =>  RedisValue::None,
+        Value::Null => RedisValue::None,
         Value::Bool(b) => RedisValue::SimpleString(b.to_string()),
         Value::Number(n) => {
             if n.is_i64() {
@@ -603,23 +603,23 @@ fn scan(doc: &Value) -> RedisValue{
             } else {
                 RedisValue::Float(n.as_f64().unwrap())
             }
-        },
+        }
         Value::String(s) => RedisValue::SimpleString(s.clone()),
         Value::Array(arr) => {
-            let mut res : Vec<RedisValue> = Vec::with_capacity(arr.len() + 1);
+            let mut res: Vec<RedisValue> = Vec::with_capacity(arr.len() + 1);
             res.push(RedisValue::SimpleStringStatic("["));
             arr.iter().for_each(|v| res.push(scan(v)));
             RedisValue::Array(res)
-        },
+        }
         Value::Object(obj) => {
-            let mut res : Vec<RedisValue> = Vec::with_capacity(obj.len() + 1);
+            let mut res: Vec<RedisValue> = Vec::with_capacity(obj.len() + 1);
             res.push(RedisValue::SimpleStringStatic("{"));
-            for (key,value) in obj.iter() {
+            for (key, value) in obj.iter() {
                 res.push(RedisValue::SimpleString(key.to_string()));
                 res.push(scan(value));
             }
             RedisValue::Array(res)
-        },
+        }
     }
 }
 
