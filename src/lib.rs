@@ -93,7 +93,7 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut set_option = SetOptions::None;
     loop {
         if let Some(s) = args.next() {
-            match s.as_str() {
+            match s.to_uppercase().as_str() {
                 "NX" => set_option = SetOptions::NotExists,
                 "XX" => set_option = SetOptions::AlreadyExists,
                 "FORMAT" => {
@@ -606,8 +606,29 @@ fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 /// MEMORY <key> [path]
 /// HELP
 ///
-fn json_debug(_ctx: &Context, _args: Vec<String>) -> RedisResult {
-    Err("Command was not implemented".into())
+fn json_debug(ctx: &Context, args: Vec<String>) -> RedisResult {
+    if args.len() < 2 {
+        return Err(RedisError::WrongArity);
+    }
+    let mut args = args.into_iter().skip(1);
+    match args.next_string()?.to_uppercase().as_str() {
+        "MEMORY" => {
+            let key = args.next_string()?;
+            let path = backwards_compat_path(args.next_string()?);
+
+            let key = ctx.open_key(&key);
+            let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
+                Some(doc) => doc.get_memory(&path)?,
+                None => 0
+            };
+            Ok(value.into())
+        }
+        "HELP" => {
+            let results : Vec<RedisValue> = vec!["MEMORY <key> [path] - reports memory usage".into(), "HELP                - this message".into()];
+            Ok(results.into())
+        }
+        _ => Err("ERR unknown subcommand - try `JSON.DEBUG HELP`".into()),
+    }
 }
 
 ///

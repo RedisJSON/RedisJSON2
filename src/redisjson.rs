@@ -5,10 +5,11 @@
 // It can be operated on (e.g. INCR) and serialized back to JSON.
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
-use serde_json::Value;
+use serde_json::{Value, Map};
 use std::os::raw::{c_int, c_void};
 use bson::decode_document;
 use std::io::Cursor;
+use std::mem;
 
 #[derive(Debug)]
 pub struct Error {
@@ -277,6 +278,28 @@ impl RedisJSON {
             1 => Err(errors.remove(0)),
             _ => Err(errors.into_iter().map(|e| e.msg).collect::<String>().into()),
         }
+    }
+
+    pub fn get_memory<'a>(&'a self, path: &'a str) -> Result<usize, Error> {
+        let res = match self.get_doc(path)? {
+            Value::Null => 0,
+            Value::Bool(_v) => mem::size_of::<bool>(),
+            Value::Number(v ) => {
+                if v.is_f64() {
+                    mem::size_of::<f64>()
+                } else if v.is_i64() {
+                    mem::size_of::<i64>()
+                } else if v.is_u64() {
+                    mem::size_of::<u64>()
+                } else {
+                    return Err("unknown Number type".into())
+                }
+            }
+            Value::String(_v) => mem::size_of::<String>(),
+            Value::Array(_v) => mem::size_of::<Vec<Value>>(),
+            Value::Object(_v) => mem::size_of::<Map<String, Value>>(),
+        };
+        Ok(res.into())
     }
 
     fn get_doc<'a>(&'a self, path: &'a str) -> Result<&'a Value, Error> {
