@@ -586,12 +586,12 @@ fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = ctx.open_key(&key);
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => Ok(scan(doc.get_doc(&path)?)),
+        Some(doc) => Ok(resp_serialize(doc.get_doc(&path)?)),
         None => Ok(().into()),
     }
 }
 
-fn scan(doc: &Value) -> RedisValue {
+fn resp_serialize(doc: &Value) -> RedisValue {
     match doc {
         Value::Null => RedisValue::None,
 
@@ -607,7 +607,7 @@ fn scan(doc: &Value) -> RedisValue {
         Value::Array(arr) => {
             let mut res: Vec<RedisValue> = Vec::with_capacity(arr.len() + 1);
             res.push(RedisValue::SimpleStringStatic("["));
-            arr.iter().for_each(|v| res.push(scan(v)));
+            arr.iter().for_each(|v| res.push(resp_serialize(v)));
             RedisValue::Array(res)
         }
 
@@ -616,7 +616,7 @@ fn scan(doc: &Value) -> RedisValue {
             res.push(RedisValue::SimpleStringStatic("{"));
             for (key, value) in obj.iter() {
                 res.push(RedisValue::SimpleString(key.to_string()));
-                res.push(scan(value));
+                res.push(resp_serialize(value));
             }
             RedisValue::Array(res)
         }
