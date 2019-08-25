@@ -594,21 +594,23 @@ fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
 fn scan(doc: &Value) -> RedisValue {
     match doc {
         Value::Null => RedisValue::None,
+
         Value::Bool(b) => RedisValue::SimpleString(b.to_string()),
-        Value::Number(n) => {
-            if n.is_i64() {
-                RedisValue::Integer(n.as_i64().unwrap())
-            } else {
-                RedisValue::Float(n.as_f64().unwrap())
-            }
-        }
+
+        Value::Number(n) => n
+            .as_i64()
+            .map(|i| RedisValue::Integer(i))
+            .unwrap_or_else(|| RedisValue::Float(n.as_f64().unwrap())),
+
         Value::String(s) => RedisValue::SimpleString(s.clone()),
+
         Value::Array(arr) => {
             let mut res: Vec<RedisValue> = Vec::with_capacity(arr.len() + 1);
             res.push(RedisValue::SimpleStringStatic("["));
             arr.iter().for_each(|v| res.push(scan(v)));
             RedisValue::Array(res)
         }
+
         Value::Object(obj) => {
             let mut res: Vec<RedisValue> = Vec::with_capacity(obj.len() + 1);
             res.push(RedisValue::SimpleStringStatic("{"));
