@@ -579,10 +579,8 @@ fn json_debug(_ctx: &Context, _args: Vec<String>) -> RedisResult {
 /// JSON.RESP <key> [path]
 ///
 fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
-    if args.len() < 3 {
-        return Err(RedisError::WrongArity);
-    }
     let mut args = args.into_iter().skip(1);
+
     let key = args.next_string()?;
     let path = backwards_compat_path(args.next_string()?);
 
