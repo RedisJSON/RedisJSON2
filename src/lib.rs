@@ -602,7 +602,7 @@ fn scan(doc: &Value) -> RedisValue {
             .map(|i| RedisValue::Integer(i))
             .unwrap_or_else(|| RedisValue::Float(n.as_f64().unwrap())),
 
-        Value::String(s) => RedisValue::SimpleString(s.clone()),
+        Value::String(s) => RedisValue::BulkString(s.clone()),
 
         Value::Array(arr) => {
             let mut res: Vec<RedisValue> = Vec::with_capacity(arr.len() + 1);
