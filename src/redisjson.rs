@@ -199,7 +199,7 @@ impl RedisJSON {
                 .and_then(|selector| {
                     Ok(selector
                         .value(current_data.clone())
-                        .replace_with(&mut |v| Some(collect_fun(v.to_owned())))?
+                        .replace_with(&mut |v| Some(collect_fun(v)))?
                         .take()
                         .unwrap_or(Value::Null))
                 })
