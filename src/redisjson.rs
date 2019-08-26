@@ -302,7 +302,7 @@ impl RedisJSON {
         Ok(res.into())
     }
 
-    fn get_doc<'a>(&'a self, path: &'a str) -> Result<&'a Value, Error> {
+    pub fn get_doc<'a>(&'a self, path: &'a str) -> Result<&'a Value, Error> {
         let results = jsonpath_lib::select(&self.data, path)?;
         match results.first() {
             Some(s) => Ok(s),
