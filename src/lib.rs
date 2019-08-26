@@ -607,9 +607,6 @@ fn json_obj_len(ctx: &Context, args: Vec<String>) -> RedisResult {
 /// HELP
 ///
 fn json_debug(ctx: &Context, args: Vec<String>) -> RedisResult {
-    if args.len() < 2 {
-        return Err(RedisError::WrongArity);
-    }
     let mut args = args.into_iter().skip(1);
     match args.next_string()?.to_uppercase().as_str() {
         "MEMORY" => {
@@ -624,7 +621,7 @@ fn json_debug(ctx: &Context, args: Vec<String>) -> RedisResult {
             Ok(value.into())
         }
         "HELP" => {
-            let results : Vec<RedisValue> = vec!["MEMORY <key> [path] - reports memory usage".into(), "HELP                - this message".into()];
+            let results = vec!["MEMORY <key> [path] - reports memory usage", "HELP                - this message"];
             Ok(results.into())
         }
         _ => Err("ERR unknown subcommand - try `JSON.DEBUG HELP`".into()),
