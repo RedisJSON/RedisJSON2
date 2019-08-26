@@ -616,12 +616,15 @@ fn json_debug(ctx: &Context, args: Vec<String>) -> RedisResult {
             let key = ctx.open_key(&key);
             let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
                 Some(doc) => doc.get_memory(&path)?,
-                None => 0
+                None => 0,
             };
             Ok(value.into())
         }
         "HELP" => {
-            let results = vec!["MEMORY <key> [path] - reports memory usage", "HELP                - this message"];
+            let results = vec![
+                "MEMORY <key> [path] - reports memory usage",
+                "HELP                - this message",
+            ];
             Ok(results.into())
         }
         _ => Err("ERR unknown subcommand - try `JSON.DEBUG HELP`".into()),

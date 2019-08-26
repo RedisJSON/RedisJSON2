@@ -3,13 +3,13 @@
 // Translate between JSON and tree of Redis objects:
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
+use bson::decode_document;
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
-use serde_json::{Value, Map};
-use std::os::raw::{c_int, c_void};
-use bson::decode_document;
+use serde_json::{Map, Value};
 use std::io::Cursor;
 use std::mem;
+use std::os::raw::{c_int, c_void};
 
 #[derive(Debug)]
 pub struct Error {
@@ -71,21 +71,21 @@ pub struct RedisJSON {
 
 impl RedisJSON {
     pub fn parse_str(data: &str, format: Format) -> Result<Value, Error> {
-        let value: Value = match format {
-            Format::JSON => serde_json::from_str(data)?,
-            Format::BSON => match decode_document(&mut Cursor::new(data.as_bytes())) {
-                Ok(d) => {
-                    let mut iter = d.iter();
-                    if d.len() >= 1 {
-                        iter.next().map_or_else(|| Value::Null, |(_, b)| b.clone().into())
+        match format {
+            Format::JSON => Ok(serde_json::from_str(data)?),
+            Format::BSON => decode_document(&mut Cursor::new(data.as_bytes()))
+                .map(|docs| {
+                    let v = if docs.len() >= 1 {
+                        docs.iter()
+                            .next()
+                            .map_or_else(|| Value::Null, |(_, b)| b.clone().into())
                     } else {
                         Value::Null
-                    }
-                }
-                Err(e) => return Err(e.to_string().into()),
-            },
-        };
-        Ok(value)
+                    };
+                    Ok(v)
+                })
+                .unwrap_or_else(|e| Err(e.to_string().into())),
+        }
     }
 
     pub fn from_str(data: &str, format: Format) -> Result<Self, Error> {
@@ -281,7 +281,7 @@ impl RedisJSON {
         let res = match self.get_doc(path)? {
             Value::Null => 0,
             Value::Bool(_v) => mem::size_of::<bool>(),
-            Value::Number(v ) => {
+            Value::Number(v) => {
                 if v.is_f64() {
                     mem::size_of::<f64>()
                 } else if v.is_i64() {
@@ -289,7 +289,7 @@ impl RedisJSON {
                 } else if v.is_u64() {
                     mem::size_of::<u64>()
                 } else {
-                    return Err("unknown Number type".into())
+                    return Err("unknown Number type".into());
                 }
             }
             Value::String(_v) => mem::size_of::<String>(),
