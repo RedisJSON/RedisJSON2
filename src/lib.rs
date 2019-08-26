@@ -101,12 +101,12 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let current = key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?;
 
     match (current, set_option) {
-        (Some(_), Some(SetOptions::NotExists)) => Ok(().into()),
+        (Some(_), Some(SetOptions::NotExists)) => Ok(RedisValue::None),
         (Some(ref mut doc), _) => {
             doc.set_value(&value, &path)?;
             REDIS_OK
         }
-        (None, Some(SetOptions::AlreadyExists)) => Ok(().into()),
+        (None, Some(SetOptions::AlreadyExists)) => Ok(RedisValue::None),
         (None, _) => {
             let doc = RedisJSON::from_str(&value)?;
             if path == "$" {
@@ -153,7 +153,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.to_string(&path)?.into(),
-        None => ().into(),
+        None => RedisValue::None,
     };
 
     Ok(value)
@@ -554,7 +554,7 @@ fn json_obj_keys(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.obj_keys(&path)?.into(),
-        None => ().into(),
+        None => RedisValue::None,
     };
 
     Ok(value)
@@ -590,7 +590,7 @@ fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key(&key);
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => Ok(resp_serialize(doc.get_doc(&path)?)),
-        None => Ok(().into()),
+        None => Ok(RedisValue::None),
     }
 }
 
@@ -638,7 +638,7 @@ fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(
     let key = ctx.open_key(&key);
     let length = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => fun(&doc, &path)?.into(),
-        None => ().into(),
+        None => RedisValue::None,
     };
 
     Ok(length)
