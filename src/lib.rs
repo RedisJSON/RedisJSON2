@@ -205,10 +205,13 @@ fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = ctx.open_key(&key);
 
-    let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => doc.get_type(&path)?.into(),
-        None => ().into(),
-    };
+    let value = key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?.map_or_else(
+        || RedisValue::None,
+        |doc| match doc.get_type(&path) {
+            Ok(s) => s.into(),
+            Err(_) => RedisValue::None,
+        },
+    );
 
     Ok(value)
 }

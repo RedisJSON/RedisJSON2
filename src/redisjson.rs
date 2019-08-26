@@ -70,7 +70,7 @@ impl RedisJSON {
             let current_data = self.data.take();
             self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
                 replaced = true;
-                json.clone()
+                Some(json.clone())
             })?;
             if replaced {
                 Ok(())
@@ -88,7 +88,7 @@ impl RedisJSON {
             if !v.is_null() {
                 deleted = deleted + 1; // might delete more than a single value
             }
-            Value::Null
+            None
         })?;
         Ok(deleted)
     }
@@ -199,7 +199,7 @@ impl RedisJSON {
                 .and_then(|selector| {
                     Ok(selector
                         .value(current_data.clone())
-                        .replace_with(&mut |v| collect_fun(v.to_owned()))?
+                        .replace_with(&mut |v| Some(collect_fun(v.to_owned())))?
                         .take()
                         .unwrap_or(Value::Null))
                 })
