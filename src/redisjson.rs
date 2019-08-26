@@ -77,10 +77,7 @@ impl RedisJSON {
                 Ok(d) => {
                     let mut iter = d.iter();
                     if d.len() >= 1 {
-                        match iter.next() {
-                            Some((_, b)) => b.clone().into(),
-                            None => Value::Null,
-                        }
+                        iter.next().map_or_else(|| Value::Null, |(_, b)| b.clone().into())
                     } else {
                         Value::Null
                     }
