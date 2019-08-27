@@ -169,31 +169,31 @@ class ReJSONTestCase(BaseReJSONTest):
             self.assertEqual(json.dumps(json.loads(
                 r.execute_command('JSON.GET', 'test'))), data)
 
-    # def testSetBehaviorModifyingSubcommands(self):
-    #     """Test JSON.SET's NX and XX subcommands"""
-    #
-    #     with self.redis() as r:
-    #         r.client_setname(self._testMethodName)
-    #         r.flushdb()
-    #
-    #         # test against the root
-    #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
-    #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
-    #
-    #         # test an object key
-    #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'XX'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'NX'))
-    #         self.assertIsNone(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'NX'))
-    #         self.assertOk(r.execute_command('JSON.SET', 'test', '.foo', '[1]', 'XX'))
-    #
-    #         # verify failure for arrays
-    #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
-    #             r.execute_command('JSON.SET', 'test', '.foo[1]', 'null', 'NX')
-    #         with self.assertRaises(redis.exceptions.ResponseError) as cm:
-    #             r.execute_command('JSON.SET', 'test', '.foo[1]', 'null', 'XX')
-    #
+    def testSetBehaviorModifyingSubcommands(self):
+        """Test JSON.SET's NX and XX subcommands"""
+    
+        with self.redis() as r:
+            r.client_setname(self._testMethodName)
+            r.flushdb()
+    
+            # test against the root
+            self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
+            self.assertIsNone(r.execute_command('JSON.SET', 'test', '.', '{}', 'NX'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.', '{}', 'XX'))
+    
+            # test an object key
+            self.assertIsNone(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'XX'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'NX'))
+            self.assertIsNone(r.execute_command('JSON.SET', 'test', '.foo', '[]', 'NX'))
+            self.assertOk(r.execute_command('JSON.SET', 'test', '.foo', '[1]', 'XX'))
+    
+            # verify failure for arrays
+            with self.assertRaises(redis.exceptions.ResponseError) as cm:
+                r.execute_command('JSON.SET', 'test', '.foo[1]', 'null', 'NX')
+            # with self.assertRaises(redis.exceptions.ResponseError) as cm:
+            #     r.execute_command('JSON.SET', 'test', '.foo[1]', 'null', 'XX')
+    
     def testGetNonExistantPathsFromBasicDocumentShouldFail(self):
         """Test failure of getting non-existing values"""
     
