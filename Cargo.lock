@@ -193,7 +193,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "jsonpath_lib"
 version = "0.2.3"
-source = "git+https://github.com/gkorland/jsonpath.git?branch=reaplce_with_ownership#ed32ad7de16dd59a3c02f914fe66685ede2757bc"
+source = "git+https://github.com/gkorland/jsonpath.git?branch=reaplce_with_ownership#81726f92bed7d61d233d5624c322bac7f8d4b007"
 dependencies = [
  "array_tool 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -319,7 +319,7 @@ dependencies = [
 [[package]]
 name = "redismodule"
 version = "0.3.0"
-source = "git+https://github.com/RedisLabsModules/redismodule-rs.git#e30759e7c8800f22da7ae09528f8266f7accd9ca"
+source = "git+https://github.com/RedisLabsModules/redismodule-rs.git#130e7605673ed32e43c5a33a394d48b8773c122d"
 dependencies = [
  "bindgen 0.51.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
