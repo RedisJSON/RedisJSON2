@@ -1,16 +1,20 @@
 #[macro_use]
 extern crate redismodule;
 
+use redisearch_api;
 use redismodule::native_types::RedisType;
 use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_OK};
 use serde_json::{Number, Value};
 use std::{i64, usize};
 
+mod error;
 mod index;
 mod redisjson;
+mod redisjsonschema;
 
 use crate::index::Index;
-use crate::redisjson::{Error, RedisJSON};
+use crate::redisjson::{RedisJSON};
+use crate::error::{Error};
 
 static JSON_TYPE_ENCODING_VERSION: i32 = 2;
 static JSON_TYPE_NAME: &str = "ReJSON-RL";
@@ -25,6 +29,26 @@ static REDIS_JSON_TYPE: RedisType = RedisType::new(
         rdb_save: Some(redisjson::json_rdb_save),
         aof_rewrite: None, // TODO add support
         free: Some(redisjson::json_free),
+
+        // Currently unused by Redis
+        mem_usage: None,
+        digest: None,
+    },
+);
+
+static JSON_SCHEMA_ENCODING_VERSION: i32 = 1;
+static JSON_SCHEMA_NAME: &str = "ReJSON-SCHEMA";
+
+static REDIS_JSON_SCHEMA_TYPE: RedisType = RedisType::new(
+    JSON_SCHEMA_NAME,
+    JSON_SCHEMA_ENCODING_VERSION,
+    raw::RedisModuleTypeMethods {
+        version: raw::REDISMODULE_TYPE_METHOD_VERSION as u64,
+
+        rdb_load: Some(redisjsonschema::json_schema_rdb_load),
+        rdb_save: Some(redisjsonschema::json_schema_rdb_save),
+        aof_rewrite: None, // TODO add support
+        free: Some(redisjsonschema::json_schema_free),
 
         // Currently unused by Redis
         mem_usage: None,
@@ -641,6 +665,10 @@ fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(
     Ok(length)
 }
 
+fn json_createindex(_ctx: &Context, _args: Vec<String>) -> RedisResult {
+    Err("Command was not implemented".into())
+}
+
 fn json_cache_info(_ctx: &Context, _args: Vec<String>) -> RedisResult {
     Err("Command was not implemented".into())
 }
@@ -655,6 +683,7 @@ redis_module! {
     version: 1,
     data_types: [
         REDIS_JSON_TYPE,
+        REDIS_JSON_SCHEMA_TYPE
     ],
     commands: [
         ["json.del", json_del, "write"],
@@ -678,6 +707,7 @@ redis_module! {
         ["json.debug", json_debug, ""],
         ["json.forget", json_del, "write"],
         ["json.resp", json_resp, ""],
+        ["json.createindex", json_createindex, "write"],
         ["json._cacheinfo", json_cache_info, ""],
         ["json._cacheinit", json_cache_init, "write"],
     ],

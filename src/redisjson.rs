@@ -3,47 +3,12 @@
 // Translate between JSON and tree of Redis objects:
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
-use jsonpath_lib::{JsonPathError, SelectorMut};
+use jsonpath_lib::{SelectorMut};
 use redismodule::raw;
 use serde_json::Value;
 use std::os::raw::{c_int, c_void};
+use crate::error::Error;
 
-#[derive(Debug)]
-pub struct Error {
-    msg: String,
-}
-
-impl From<String> for Error {
-    fn from(e: String) -> Self {
-        Error { msg: e }
-    }
-}
-
-impl From<&str> for Error {
-    fn from(e: &str) -> Self {
-        Error { msg: e.to_string() }
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Self {
-        Error { msg: e.to_string() }
-    }
-}
-
-impl From<JsonPathError> for Error {
-    fn from(e: JsonPathError) -> Self {
-        Error {
-            msg: format!("{:?}", e),
-        }
-    }
-}
-
-impl From<Error> for redismodule::RedisError {
-    fn from(e: Error) -> Self {
-        redismodule::RedisError::String(e.msg)
-    }
-}
 
 #[derive(Debug)]
 pub struct RedisJSON {
@@ -70,7 +35,7 @@ impl RedisJSON {
             let current_data = self.data.take();
             self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
                 replaced = true;
-                json.clone()
+                Some(json.clone())
             })?;
             if replaced {
                 Ok(())
@@ -88,7 +53,7 @@ impl RedisJSON {
             if !v.is_null() {
                 deleted = deleted + 1; // might delete more than a single value
             }
-            Value::Null
+            Some(Value::Null)
         })?;
         Ok(deleted)
     }
@@ -199,7 +164,7 @@ impl RedisJSON {
                 .and_then(|selector| {
                     Ok(selector
                         .value(current_data.clone())
-                        .replace_with(&mut |v| collect_fun(v.to_owned()))?
+                        .replace_with(&mut |v| Some(collect_fun(v)))?
                         .take()
                         .unwrap_or(Value::Null))
                 })
