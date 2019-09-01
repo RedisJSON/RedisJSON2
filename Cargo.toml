@@ -13,4 +13,4 @@ serde_json = "1.0"
 libc = "0.2"
 jsonpath_lib = { git="https://github.com/freestrings/jsonpath.git", branch="master" }
 redismodule = { git = "https://github.com/RedisLabsModules/redismodule-rs.git", rev = "a070329" }
-redisearch_api = { git = "https://github.com/RediSearch/redisearch-api-rs.git", branch = "sub-redismodule" }
+redisearch_api = { git = "https://github.com/RediSearch/redisearch-api-rs.git", rev = "a69574e" }
