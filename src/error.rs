@@ -1,5 +1,4 @@
-
-use jsonpath_lib::{JsonPathError};
+use jsonpath_lib::JsonPathError;
 
 #[derive(Debug)]
 pub struct Error {
