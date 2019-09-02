@@ -7,6 +7,7 @@ use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
 use serde_json::Value;
 use std::os::raw::{c_int, c_void};
+use crate::backward;
 
 #[derive(Debug)]
 pub struct Error {
@@ -70,7 +71,7 @@ impl RedisJSON {
             let current_data = self.data.take();
             self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
                 replaced = true;
-                json.clone()
+                Some(json.clone())
             })?;
             if replaced {
                 Ok(())
@@ -88,7 +89,7 @@ impl RedisJSON {
             if !v.is_null() {
                 deleted = deleted + 1; // might delete more than a single value
             }
-            Value::Null
+            Some(Value::Null)
         })?;
         Ok(deleted)
     }
@@ -199,7 +200,7 @@ impl RedisJSON {
                 .and_then(|selector| {
                     Ok(selector
                         .value(current_data.clone())
-                        .replace_with(&mut |v| collect_fun(v.to_owned()))?
+                        .replace_with(&mut |v| Some(collect_fun(v)))?
                         .take()
                         .unwrap_or(Value::Null))
                 })
@@ -227,10 +228,15 @@ impl RedisJSON {
 
 #[allow(non_snake_case, unused)]
 pub unsafe extern "C" fn json_rdb_load(rdb: *mut raw::RedisModuleIO, encver: c_int) -> *mut c_void {
-    if encver < 2 {
-        panic!("Can't load old RedisJSON RDB"); // TODO add support for backward
-    }
-    let json = RedisJSON::from_str(&raw::load_string(rdb)).unwrap();
+    let json = match encver {
+        0 => {
+            RedisJSON { data: backward::json_rdb_load(rdb) }
+        }
+        2 => {
+            RedisJSON::from_str(&raw::load_string(rdb)).unwrap()
+        }
+        _ => panic!("Can't load old RedisJSON RDB")
+    };
     Box::into_raw(Box::new(json)) as *mut c_void
 }
 

@@ -8,6 +8,7 @@ use std::{i64, usize};
 
 mod index;
 mod redisjson;
+mod backward;
 
 use crate::index::Index;
 use crate::redisjson::{Error, RedisJSON};
