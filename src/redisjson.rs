@@ -3,7 +3,10 @@
 // Translate between JSON and tree of Redis objects:
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
+
 use bson::decode_document;
+use crate::backward;
+use crate::nodevisitor::NodeVisitorImpl;
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
 use serde_json::{Map, Value};
@@ -14,6 +17,13 @@ use std::os::raw::{c_int, c_void};
 #[derive(Debug)]
 pub struct Error {
     msg: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SetOptions {
+    NotExists,
+    AlreadyExists,
+    None,
 }
 
 impl From<String> for Error {
@@ -92,23 +102,76 @@ impl RedisJSON {
         let value = RedisJSON::parse_str(data, format)?;
         Ok(Self { data: value })
     }
+    fn add_value(&mut self, path: &str, value: Value) -> Result<bool, Error> {
+        if NodeVisitorImpl::check(path)? {
+            let mut splits = path.rsplitn(2, '.');
+            let key = splits.next().unwrap();
+            let prefix = splits.next().unwrap();
 
-    pub fn set_value(&mut self, data: &str, path: &str, format: Format) -> Result<(), Error> {
+            let mut current_data = self.data.take();
+            if prefix == "$" {
+                let res = if let Value::Object(ref mut map) = current_data {
+                    if map.contains_key(key) {
+                        false
+                    } else {
+                        map.insert(key.to_string(), value.clone());
+                        true
+                    }
+                } else {
+                    false
+                };
+                self.data = current_data;
+                Ok(res)
+            } else {
+                let mut set = false;
+                self.data = jsonpath_lib::replace_with(current_data, prefix, &mut |mut ret| {
+                    if let Value::Object(ref mut map) = ret {
+                        if map.contains_key(key) {
+                            set = false;
+                        } else {
+                            map.insert(key.to_string(), value.clone());
+                            set = true;
+                        }
+                    }
+                    Some(ret)
+                })?;
+                Ok(set)
+            }
+        } else {
+            Err("Err: wrong static path".into())
+        }
+    }
+
+    pub fn set_value(
+        &mut self,
+        data: &str,
+        path: &str,
+        option: &SetOptions,
+        format: Format
+    ) -> Result<bool, Error> {
         let json: Value = RedisJSON::parse_str(data, format)?;
         if path == "$" {
-            self.data = json;
-            Ok(())
+            if SetOptions::NotExists == *option {
+                Ok(false)
+            } else {
+                self.data = json;
+                Ok(true)
+            }
         } else {
             let mut replaced = false;
-            let current_data = self.data.take();
-            self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
-                replaced = true;
-                Some(json.clone())
-            })?;
+            if SetOptions::NotExists != *option {
+                let current_data = self.data.take();
+                self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
+                    replaced = true;
+                    Some(json.clone())
+                })?;
+            }
             if replaced {
-                Ok(())
+                Ok(true)
+            } else if SetOptions::AlreadyExists != *option {
+                self.add_value(path, json)
             } else {
-                Err(format!("ERR missing path {}", path).into())
+                Ok(false)
             }
         }
     }
@@ -121,7 +184,7 @@ impl RedisJSON {
             if !v.is_null() {
                 deleted = deleted + 1; // might delete more than a single value
             }
-            Some(Value::Null)
+            None
         })?;
         Ok(deleted)
     }
@@ -160,31 +223,31 @@ impl RedisJSON {
     }
 
     pub fn str_len(&self, path: &str) -> Result<usize, Error> {
-        match self.get_doc(path)?.as_str() {
-            Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_str()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|s| s.len())
     }
 
     pub fn arr_len(&self, path: &str) -> Result<usize, Error> {
-        match self.get_doc(path)?.as_array() {
-            Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_array()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|arr| arr.len())
     }
 
     pub fn obj_len(&self, path: &str) -> Result<usize, Error> {
-        match self.get_doc(path)?.as_object() {
-            Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_object()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|obj| obj.len())
     }
 
     pub fn obj_keys<'a>(&'a self, path: &'a str) -> Result<Vec<&'a String>, Error> {
-        match self.get_doc(path)?.as_object() {
-            Some(o) => Ok(o.keys().collect()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_object()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|obj| obj.keys().collect())
     }
 
     pub fn arr_index(
@@ -310,10 +373,13 @@ impl RedisJSON {
 
 #[allow(non_snake_case, unused)]
 pub unsafe extern "C" fn json_rdb_load(rdb: *mut raw::RedisModuleIO, encver: c_int) -> *mut c_void {
-    if encver < 2 {
-        panic!("Can't load old RedisJSON RDB"); // TODO add support for backward
-    }
-    let json = RedisJSON::from_str(&raw::load_string(rdb), Format::JSON).unwrap();
+    let json = match encver {
+        0 => RedisJSON {
+            data: backward::json_rdb_load(rdb),
+        },
+        2 => RedisJSON::from_str(&raw::load_string(rdb), Format::JSON).unwrap(),
+        _ => panic!("Can't load old RedisJSON RDB"),
+    };
     Box::into_raw(Box::new(json)) as *mut c_void
 }
 
