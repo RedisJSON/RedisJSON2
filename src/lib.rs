@@ -2,12 +2,12 @@
 extern crate redismodule;
 
 use redismodule::native_types::RedisType;
+use redismodule::raw as rawmod;
+use redismodule::raw::RedisModuleTypeMethods;
 use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_OK};
 use serde_json::{Number, Value};
-use std::{i64, usize};
-use redismodule::raw as rawmod;
-use std::cell::RefCell;
 
+use std::{i64, usize};
 
 mod error;
 mod index;
@@ -668,18 +668,28 @@ fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(
 }
 
 fn json_createindex(ctx: &Context, args: Vec<String>) -> RedisResult {
-    // let mut args = args.into_iter().skip(1);
-    // // let schema_name = args.next_string()?;
-    // // let schema_name = args.next_string()?;
-    // let path = args.next_string()?;
+    let mut args = args.into_iter().skip(1);
 
-    // unsafe{
-    //     schema.map(|mut s| s.add_index(path.as_str()));
-    // }
-    // REDIS_OK
-    // add_index
-        Err("Command was not implemented".into())
+    let schema_name = args.next_string()?;
+    let mut paths = args.peekable();
 
+    paths.peek().ok_or(RedisError::WrongArity)?;
+
+    // Create index if not exists
+    let schema_key = ctx.open_key_writable(&schema_name);
+
+    if schema_key.is_empty() {
+        let mut schema = RedisJSONSchema::new(&schema_name);
+        for path in paths {
+            schema.add_index(&path)?;
+        }
+        schema_key.set_value(&REDIS_JSON_SCHEMA_TYPE, schema)?;
+
+        Ok(().into())
+    } else {
+        // TODO: Should we instead overwrite it?
+        Err("Index already exists".into())
+    }
 }
 
 fn json_cache_info(_ctx: &Context, _args: Vec<String>) -> RedisResult {
@@ -692,7 +702,6 @@ fn json_cache_init(_ctx: &Context, _args: Vec<String>) -> RedisResult {
 //////////////////////////////////////////////////////
 
 pub extern "C" fn init(raw_ctx: *mut rawmod::RedisModuleCtx) -> c_int {
-    // unsafe{ schema = Some(RedisJSONSchema::new("schema"));}
     redisearch_api::init(raw_ctx)
 }
 
