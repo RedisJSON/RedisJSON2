@@ -9,7 +9,7 @@ use crate::nodevisitor::NodeVisitorImpl;
 use bson::decode_document;
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::io::Cursor;
 use std::mem;
 use std::os::raw::{c_int, c_void};
