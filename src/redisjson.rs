@@ -341,23 +341,14 @@ impl RedisJSON {
     }
 
     pub fn get_memory<'a>(&'a self, path: &'a str) -> Result<usize, Error> {
+        // TODO add better calculation, handle wrappers, internals and length
         let res = match self.get_doc(path)? {
             Value::Null => 0,
-            Value::Bool(_v) => mem::size_of::<bool>(),
-            Value::Number(v) => {
-                if v.is_f64() {
-                    mem::size_of::<f64>()
-                } else if v.is_i64() {
-                    mem::size_of::<i64>()
-                } else if v.is_u64() {
-                    mem::size_of::<u64>()
-                } else {
-                    return Err("unknown Number type".into());
-                }
-            }
-            Value::String(_v) => mem::size_of::<String>(),
-            Value::Array(_v) => mem::size_of::<Vec<Value>>(),
-            Value::Object(_v) => mem::size_of::<Map<String, Value>>(),
+            Value::Bool(v) => mem::size_of_val(v),
+            Value::Number(v) => mem::size_of_val(v),
+            Value::String(v) => mem::size_of_val(v), 
+            Value::Array(v) => mem::size_of_val(v), 
+            Value::Object(v) => mem::size_of_val(v),
         };
         Ok(res.into())
     }
