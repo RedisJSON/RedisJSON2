@@ -310,12 +310,9 @@ dependencies = [
 name = "redisjson"
 version = "0.3.0"
 dependencies = [
- "jsonpath_lib 0.2.3 (git+https://github.com/freestrings/jsonpath.git)",
- "libc 0.2.62 (registry+https://github.com/rust-lang/crates.io-index)",
- "redismodule 0.3.0 (git+https://github.com/redislabsmodules/redismodule-rs.git?branch=load_rdb)",
  "jsonpath_lib 0.2.3 (git+https://github.com/gkorland/jsonpath.git?branch=reaplce_with_ownership_parser)",
  "libc 0.2.62 (registry+https://github.com/rust-lang/crates.io-index)",
- "redismodule 0.3.0 (git+https://github.com/RedisLabsModules/redismodule-rs.git)",
+ "redismodule 0.3.0 (git+https://github.com/redislabsmodules/redismodule-rs.git?branch=load_rdb)",
  "serde_json 1.0.40 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

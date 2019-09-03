@@ -6,10 +6,10 @@ use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_O
 use serde_json::{Number, Value};
 use std::{i64, usize};
 
+mod backward;
 mod index;
 mod nodevisitor;
 mod redisjson;
-mod backward;
 
 use crate::index::Index;
 use crate::redisjson::{Error, RedisJSON, SetOptions};
