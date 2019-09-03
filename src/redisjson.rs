@@ -3,6 +3,7 @@
 // Translate between JSON and tree of Redis objects:
 // User-provided JSON is converted to a tree. This tree is stored transparently in Redis.
 // It can be operated on (e.g. INCR) and serialized back to JSON.
+use crate::nodevisitor::NodeVisitorImpl;
 use jsonpath_lib::{JsonPathError, SelectorMut};
 use redismodule::raw;
 use serde_json::Value;
@@ -12,6 +13,13 @@ use crate::backward;
 #[derive(Debug)]
 pub struct Error {
     msg: String,
+}
+
+
+#[derive(Debug, PartialEq)]
+pub enum SetOptions {
+    NotExists,
+    AlreadyExists,
 }
 
 impl From<String> for Error {
@@ -52,6 +60,46 @@ pub struct RedisJSON {
 }
 
 impl RedisJSON {
+    fn add_value(&mut self, path: &str, value: Value) -> Result<bool, Error> {
+        if NodeVisitorImpl::check(path)? {
+            let mut splits = path.rsplitn(2, '.');
+            let key = splits.next().unwrap();
+            let prefix = splits.next().unwrap();
+
+            let mut current_data = self.data.take();
+            if prefix == "$" {
+                let res = if let Value::Object(ref mut map) = current_data {
+                    if map.contains_key(key) {
+                        false
+                    } else {
+                        map.insert(key.to_string(), value.clone());
+                        true
+                    }
+                } else {
+                    false
+                };
+                self.data = current_data;
+                Ok(res)
+            } else {
+                let mut set = false;
+                self.data = jsonpath_lib::replace_with(current_data, prefix, &mut |mut ret| {
+                    if let Value::Object(ref mut map) = ret {
+                        if map.contains_key(key) {
+                            set = false;
+                        } else {
+                            map.insert(key.to_string(), value.clone());
+                            set = true;
+                        }
+                    }
+                    Some(ret)
+                })?;
+                Ok(set)
+            }
+        } else {
+            Err("Err: wrong static path".into())
+        }
+    }
+
     pub fn from_str(data: &str) -> Result<Self, Error> {
         // Parse the string of data into serde_json::Value.
         let v: Value = serde_json::from_str(data)?;
@@ -59,24 +107,32 @@ impl RedisJSON {
         Ok(Self { data: v })
     }
 
-    pub fn set_value(&mut self, data: &str, path: &str) -> Result<(), Error> {
+    pub fn set_value(&mut self, data: &str, path: &str, option: &Option<SetOptions>) -> Result<bool, Error> {
         // Parse the string of data into serde_json::Value.
         let json: Value = serde_json::from_str(data)?;
 
-        if path == "$" {
-            self.data = json;
-            Ok(())
+        if  path == "$" {
+            if Some(SetOptions::NotExists) == *option {
+                Ok(false)
+            } else {
+                self.data = json;
+                Ok(true)
+            }
         } else {
             let mut replaced = false;
-            let current_data = self.data.take();
-            self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
-                replaced = true;
-                Some(json.clone())
-            })?;
+            if Some(SetOptions::NotExists) != *option {
+                let current_data = self.data.take();
+                self.data = jsonpath_lib::replace_with(current_data, path, &mut |_v| {
+                    replaced = true;
+                    Some(json.clone())
+                })?;
+            }
             if replaced {
-                Ok(())
+                Ok(true)
+            } else if Some(SetOptions::AlreadyExists) != *option {
+                self.add_value(path, json)
             } else {
-                Err(format!("ERR missing path {}", path).into())
+                Ok(false)
             }
         }
     }
@@ -89,7 +145,7 @@ impl RedisJSON {
             if !v.is_null() {
                 deleted = deleted + 1; // might delete more than a single value
             }
-            Some(Value::Null)
+            None
         })?;
         Ok(deleted)
     }
@@ -100,31 +156,31 @@ impl RedisJSON {
     }
 
     pub fn str_len(&self, path: &str) -> Result<usize, Error> {
-        match self.get_doc(path)?.as_str() {
-            Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_str()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|s| s.len())
     }
 
     pub fn arr_len(&self, path: &str) -> Result<usize, Error> {
-        match self.get_doc(path)?.as_array() {
-            Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_array()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|arr| arr.len())
     }
 
     pub fn obj_len(&self, path: &str) -> Result<usize, Error> {
-        match self.get_doc(path)?.as_object() {
-            Some(s) => Ok(s.len()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_object()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|obj| obj.len())
     }
 
     pub fn obj_keys<'a>(&'a self, path: &'a str) -> Result<Vec<&'a String>, Error> {
-        match self.get_doc(path)?.as_object() {
-            Some(o) => Ok(o.keys().collect()),
-            None => Err("ERR wrong type of path value".into()),
-        }
+        self.get_doc(path)?
+            .as_object()
+            .ok_or_else(|| "ERR wrong type of path value".into())
+            .map(|obj| obj.keys().collect())
     }
 
     pub fn arr_index(

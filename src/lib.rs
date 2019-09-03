@@ -7,11 +7,12 @@ use serde_json::{Number, Value};
 use std::{i64, usize};
 
 mod index;
+mod nodevisitor;
 mod redisjson;
 mod backward;
 
 use crate::index::Index;
-use crate::redisjson::{Error, RedisJSON};
+use crate::redisjson::{Error, RedisJSON, SetOptions};
 
 static JSON_TYPE_ENCODING_VERSION: i32 = 2;
 static JSON_TYPE_NAME: &str = "ReJSON-RL";
@@ -32,12 +33,6 @@ static REDIS_JSON_TYPE: RedisType = RedisType::new(
         digest: None,
     },
 );
-
-#[derive(Debug, PartialEq)]
-pub enum SetOptions {
-    NotExists,
-    AlreadyExists,
-}
 
 ///
 /// Backwards compatibility convertor for RedisJSON 1.x clients
@@ -102,12 +97,14 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
     let current = key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?;
 
     match (current, set_option) {
-        (Some(_), Some(SetOptions::NotExists)) => Ok(().into()),
-        (Some(ref mut doc), _) => {
-            doc.set_value(&value, &path)?;
-            REDIS_OK
+        (Some(ref mut doc), ref op) => {
+            if doc.set_value(&value, &path, op)? {
+                REDIS_OK
+            } else {
+                Ok(RedisValue::None)
+            }
         }
-        (None, Some(SetOptions::AlreadyExists)) => Ok(().into()),
+        (None, Some(SetOptions::AlreadyExists)) => Ok(RedisValue::None),
         (None, _) => {
             let doc = RedisJSON::from_str(&value)?;
             if path == "$" {
@@ -154,7 +151,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.to_string(&path)?.into(),
-        None => ().into(),
+        None => RedisValue::None,
     };
 
     Ok(value)
@@ -206,10 +203,13 @@ fn json_type(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = ctx.open_key(&key);
 
-    let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => doc.get_type(&path)?.into(),
-        None => ().into(),
-    };
+    let value = key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?.map_or_else(
+        || RedisValue::None,
+        |doc| match doc.get_type(&path) {
+            Ok(s) => s.into(),
+            Err(_) => RedisValue::None,
+        },
+    );
 
     Ok(value)
 }
@@ -552,7 +552,7 @@ fn json_obj_keys(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => doc.obj_keys(&path)?.into(),
-        None => ().into(),
+        None => RedisValue::None,
     };
 
     Ok(value)
@@ -588,7 +588,7 @@ fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key(&key);
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => Ok(resp_serialize(doc.get_doc(&path)?)),
-        None => Ok(().into()),
+        None => Ok(RedisValue::None),
     }
 }
 
@@ -636,7 +636,7 @@ fn json_len<F: Fn(&RedisJSON, &String) -> Result<usize, Error>>(
     let key = ctx.open_key(&key);
     let length = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => fun(&doc, &path)?.into(),
-        None => ().into(),
+        None => RedisValue::None,
     };
 
     Ok(length)
