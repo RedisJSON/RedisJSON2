@@ -40,7 +40,7 @@ pub unsafe fn json_rdb_load(rdb: *mut raw::RedisModuleIO) -> Value {
         NodeType::Null => Value::Null,
         NodeType::Boolean => {
             let buffer = raw::load_string_buffer(rdb);
-            Value::Bool(buffer[0] == ('1' as u8))
+            Value::Bool(buffer.as_ref()[0] == b'1')
         }
         NodeType::Integer => Value::Number(raw::load_signed(rdb).into()),
         NodeType::Number => Value::Number(Number::from_f64(raw::load_double(rdb)).unwrap()),
