@@ -520,13 +520,15 @@ fn json_arr_pop(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key_writable(&key);
     let mut res = Value::Null;
 
-    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
+    let _: RedisResult = key
+        .get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
             doc.value_op(&path, |value| do_json_arr_pop(index, &mut res, value))
                 .map(|v| v.to_string().into())
                 .map_err(|e| e.into())
-        })
+        });
+    Ok(RedisJSON::serialize(&res, Format::JSON)?.into())
 }
 
 fn do_json_arr_pop(mut index: i64, res: &mut Value, value: &Value) -> Result<Value, Error> {
