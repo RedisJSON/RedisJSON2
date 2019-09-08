@@ -299,33 +299,39 @@ where
 
     let key = args.next_string()?;
     let path = backwards_compat_path(args.next_string()?);
-    let number: f64 = args.next_string()?.parse()?;
+    let number = args.next_string()?;
 
     let key = ctx.open_key_writable(&key);
 
     key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)?
         .ok_or_else(RedisError::nonexistent_key)
         .and_then(|doc| {
-            doc.value_op(&path, |value| do_json_num_op(&fun, number, value))
+            doc.value_op(&path, |value| do_json_num_op(&fun, &number, value))
                 .map(|v| v.to_string().into())
                 .map_err(|e| e.into())
         })
 }
 
-fn do_json_num_op<F>(fun: F, number: f64, value: &Value) -> Result<Value, Error>
+fn do_json_num_op<F>(fun: F, number: &String, value: &Value) -> Result<Value, Error>
 where
     F: FnOnce(f64, f64) -> f64,
 {
-    value
-        .as_f64()
-        .ok_or_else(|| err_json(value, "number"))
-        .and_then(|curr_value| {
-            let res = fun(curr_value, number);
-
-            Number::from_f64(res)
-                .ok_or(Error::from("ERR cannot represent result as Number"))
-                .map(Value::Number)
-        })
+    if let Value::Number(curr_value) = value {
+        let in_value = serde_json::from_str(number.as_str())?;
+        if let Value::Number(value) = in_value {
+            // TODO avoid convert to f64 when not needed 
+            let num_res = fun(curr_value.as_f64().unwrap(), value.as_f64().unwrap());
+            if curr_value.is_f64() || value.is_f64() {
+                Ok(num_res.into())
+            } else {
+                Ok((num_res as i64).into())
+            }
+        } else {
+            Err(err_json(&in_value, "number"))
+        }
+    } else {
+        Err(err_json(value, "number"))
+    }
 }
 
 fn err_json(value: &Value, expected_value: &'static str) -> Error {
