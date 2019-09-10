@@ -312,25 +312,25 @@ where
         })
 }
 
-fn do_json_num_op<F>(fun: F, number: &String, value: &Value) -> Result<Value, Error>
+fn do_json_num_op<F>(fun: F, in_value: &str, curr_value: &Value) -> Result<Value, Error>
 where
     F: FnOnce(f64, f64) -> f64,
 {
-    if let Value::Number(curr_value) = value {
-        let in_value = serde_json::from_str(number.as_str())?;
-        if let Value::Number(value) = in_value {
-            // TODO avoid convert to f64 when not needed 
-            let num_res = fun(curr_value.as_f64().unwrap(), value.as_f64().unwrap());
-            if curr_value.is_f64() || value.is_f64() {
+    if let Value::Number(curr_value) = curr_value {
+        let in_value = &serde_json::from_str(in_value)?;
+        if let Value::Number(in_value) = in_value {
+            // TODO avoid convert to f64 when not needed
+            let num_res = fun(curr_value.as_f64().unwrap(), in_value.as_f64().unwrap());
+            if curr_value.is_f64() || in_value.is_f64() {
                 Ok(num_res.into())
             } else {
                 Ok((num_res as i64).into())
             }
         } else {
-            Err(err_json(&in_value, "number"))
+            Err(err_json(in_value, "number"))
         }
     } else {
-        Err(err_json(value, "number"))
+        Err(err_json(curr_value, "number"))
     }
 }
 
