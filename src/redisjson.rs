@@ -216,7 +216,8 @@ impl RedisJSON {
 
     pub fn arr_index(&self, path: &str, scalar: &str, start: i64, end: i64) -> Result<i64, Error> {
         if let Value::Array(arr) = self.get_doc(path)? {
-            if arr.is_empty() || end < -1 {
+            // end=-1/0 means INFINITY to support backward with RedisJSON
+            if arr.is_empty() || end < -1 { 
                 return Ok(-1);
             }
             match serde_json::from_str(scalar)? {
