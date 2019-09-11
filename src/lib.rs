@@ -328,12 +328,11 @@ where
     if let Value::Number(curr_value) = curr_value {
         let in_value = &serde_json::from_str(in_value)?;
         if let Value::Number(in_value) = in_value {
-            let (num1, num2) = (curr_value, in_value);
-            let num_res = match (num1.as_i64(), num2.as_i64()) {
+            let num_res = match (curr_value.as_i64(), in_value.as_i64()) {
                 (Some(num1), Some(num2)) => op_i64(num1, num2).into(),
                 _ => {
-                    let num1 = num1.as_f64().unwrap();
-                    let num2 = num2.as_f64().unwrap();
+                    let num1 = curr_value.as_f64().unwrap();
+                    let num2 = in_value.as_f64().unwrap();
                     Number::from_f64(op_f64(num1, num2)).unwrap()
                 }
             };
