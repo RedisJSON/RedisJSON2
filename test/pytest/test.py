@@ -755,7 +755,7 @@ class ReJSONTestCase(BaseReJSONTest):
             searches = [
                 ('@first:mike', '$.last', ['"Lane"']),
                 ('@last:smith', '$.first', ['"Joe"', '"Kevin"']),
-                ('*', '$.first', ['"Joe"', '"Kevin"', '"Mike"']),
+                ('*', '$.first', ['"Joe"', '"Kevin"', '"Mike"', '"Dave"']),
             ]
 
             for (query, path, results) in searches:
