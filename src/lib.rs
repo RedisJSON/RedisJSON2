@@ -692,7 +692,7 @@ fn json_resp(ctx: &Context, args: Vec<String>) -> RedisResult {
 
     let key = ctx.open_key(&key);
     match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-        Some(doc) => Ok(resp_serialize(doc.get_doc(&path)?)),
+        Some(doc) => Ok(resp_serialize(doc.get_first(&path)?)),
         None => Ok(RedisValue::None),
     }
 }

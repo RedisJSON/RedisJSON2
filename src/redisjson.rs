@@ -154,7 +154,7 @@ impl RedisJSON {
     }
 
     pub fn to_string(&self, path: &str, format: Format) -> Result<String, Error> {
-        let results = self.get_doc(path)?;
+        let results = self.get_first(path)?;
         Self::serialize(results, format)
     }
 
@@ -193,35 +193,35 @@ impl RedisJSON {
     }
 
     pub fn str_len(&self, path: &str) -> Result<usize, Error> {
-        self.get_doc(path)?
+        self.get_first(path)?
             .as_str()
             .ok_or_else(|| "ERR wrong type of path value".into())
             .map(|s| s.len())
     }
 
     pub fn arr_len(&self, path: &str) -> Result<usize, Error> {
-        self.get_doc(path)?
+        self.get_first(path)?
             .as_array()
             .ok_or_else(|| "ERR wrong type of path value".into())
             .map(|arr| arr.len())
     }
 
     pub fn obj_len(&self, path: &str) -> Result<usize, Error> {
-        self.get_doc(path)?
+        self.get_first(path)?
             .as_object()
             .ok_or_else(|| "ERR wrong type of path value".into())
             .map(|obj| obj.len())
     }
 
     pub fn obj_keys<'a>(&'a self, path: &'a str) -> Result<Vec<&'a String>, Error> {
-        self.get_doc(path)?
+        self.get_first(path)?
             .as_object()
             .ok_or_else(|| "ERR wrong type of path value".into())
             .map(|obj| obj.keys().collect())
     }
 
     pub fn arr_index(&self, path: &str, scalar: &str, start: i64, end: i64) -> Result<i64, Error> {
-        if let Value::Array(arr) = self.get_doc(path)? {
+        if let Value::Array(arr) = self.get_first(path)? {
             // end=-1/0 means INFINITY to support backward with RedisJSON
             if arr.is_empty() || end < -1 {
                 return Ok(-1);
@@ -252,7 +252,7 @@ impl RedisJSON {
     }
 
     pub fn get_type(&self, path: &str) -> Result<String, Error> {
-        let s = RedisJSON::value_name(self.get_doc(path)?);
+        let s = RedisJSON::value_name(self.get_first(path)?);
         Ok(s.to_string())
     }
 
@@ -322,7 +322,7 @@ impl RedisJSON {
 
     pub fn get_memory<'a>(&'a self, path: &'a str) -> Result<usize, Error> {
         // TODO add better calculation, handle wrappers, internals and length
-        let res = match self.get_doc(path)? {
+        let res = match self.get_first(path)? {
             Value::Null => 0,
             Value::Bool(v) => mem::size_of_val(v),
             Value::Number(v) => mem::size_of_val(v),
@@ -333,13 +333,17 @@ impl RedisJSON {
         Ok(res.into())
     }
 
-    // TODO: Rename this to 'get_value', since 'doc' is overloaded.
-    pub fn get_doc<'a>(&'a self, path: &'a str) -> Result<&'a Value, Error> {
-        let results = jsonpath_lib::select(&self.data, path)?;
+    pub fn get_first<'a>(&'a self, path: &'a str) -> Result<&'a Value, Error> {
+        let results = self.get_values(path)?;
         match results.first() {
             Some(s) => Ok(s),
             None => Err("ERR path does not exist".into()),
         }
+    }
+
+    pub fn get_values<'a>(&'a self, path: &'a str) -> Result<Vec<&'a Value>, Error> {
+        let results = jsonpath_lib::select(&self.data, path)?;
+        Ok(results)
     }
 }
 

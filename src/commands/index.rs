@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use redismodule::{Context, RedisError, RedisResult, RedisValue};
+use redismodule::{Context, RedisError, RedisResult};
 use redismodule::{NextArg, REDIS_OK};
 
 use redisearch_api::{Document, FieldType};
@@ -91,13 +91,14 @@ fn create_document(key: &str, schema: &Schema, doc: &RedisJSON) -> Result<Docume
     let rsdoc = Document::create(key, score);
 
     for (field_name, path) in fields {
-        let value = doc.get_doc(&path)?;
-
-        match value {
-            Value::String(v) => rsdoc.add_field(field_name, &v, FieldType::FULLTEXT),
-            Value::Number(v) => rsdoc.add_field(field_name, &v.to_string(), FieldType::NUMERIC),
-            Value::Bool(v) => rsdoc.add_field(field_name, &v.to_string(), FieldType::TAG),
-            _ => {}
+        let results = doc.get_values(path)?;
+        if let Some(value) = results.first() {
+            match value {
+                Value::String(v) => rsdoc.add_field(field_name, &v, FieldType::FULLTEXT),
+                Value::Number(v) => rsdoc.add_field(field_name, &v.to_string(), FieldType::NUMERIC),
+                Value::Bool(v) => rsdoc.add_field(field_name, &v.to_string(), FieldType::TAG),
+                _ => {}
+            }
         }
     }
 
@@ -147,16 +148,27 @@ where
         .and_then(|index| {
             let results: Result<Vec<_>, RedisError> = index
                 .search(&query)?
-                .map(|key| {
+                .filter_map(|key| {
                     let key = ctx.open_key_writable(&key);
-                    let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
-                        Some(doc) => doc.to_string(&path, Format::JSON)?.into(),
-                        None => RedisValue::None,
-                    };
-                    Ok(value)
+                    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)
+                        .and_then(|value| {
+                            value
+                                .and_then(|doc| {
+                                    doc.get_values(&path)
+                                        .and_then(|values| {
+                                            values
+                                                .first()
+                                                .map(|v| RedisJSON::serialize(v, Format::JSON)) // Option<Result<String, Error>>
+                                                .transpose() // Result<Option<String>, Error>
+                                        })
+                                        .transpose() // Option<Result<String, Error>>
+                                })
+                                .transpose() // Result<Option<String>, Error>
+                                .map_err(|e| e.into()) // Result<Option<String>, RedisError>
+                        })
+                        .transpose() // Option<Result<String, RedisError>>
                 })
                 .collect();
-
             Ok(results?.into())
         })
 }
