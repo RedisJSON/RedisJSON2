@@ -158,15 +158,15 @@ where
                                         .and_then(|values| {
                                             values
                                                 .first()
-                                                .map(|v| RedisJSON::serialize(v, Format::JSON)) // Option<Result<String, Error>>
-                                                .transpose() // Result<Option<String>, Error>
+                                                .map(|v| RedisJSON::serialize(v, Format::JSON))
+                                                .transpose()
                                         })
-                                        .transpose() // Option<Result<String, Error>>
+                                        .transpose()
                                 })
-                                .transpose() // Result<Option<String>, Error>
-                                .map_err(|e| e.into()) // Result<Option<String>, RedisError>
+                                .transpose()
+                                .map_err(|e| e.into())
                         })
-                        .transpose() // Option<Result<String, RedisError>>
+                        .transpose()
                 })
                 .collect();
             Ok(results?.into())
