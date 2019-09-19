@@ -345,6 +345,24 @@ impl RedisJSON {
         let results = jsonpath_lib::select(&self.data, path)?;
         Ok(results)
     }
+
+    pub fn path_to_json<'a>(
+        value: Option<&mut RedisJSON>,
+        path: &'a str,
+    ) -> Result<Option<String>, Error> {
+        value
+            .and_then(|doc| {
+                doc.get_values(&path)
+                    .and_then(|values| {
+                        values
+                            .first()
+                            .map(|v| Self::serialize(v, Format::JSON))
+                            .transpose()
+                    })
+                    .transpose()
+            })
+            .transpose()
+    }
 }
 
 pub mod type_methods {

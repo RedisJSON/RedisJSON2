@@ -6,7 +6,7 @@ use redismodule::{NextArg, REDIS_OK};
 use redisearch_api::{Document, FieldType};
 
 use crate::error::Error;
-use crate::redisjson::{Format, RedisJSON};
+use crate::redisjson::RedisJSON;
 use crate::schema::Schema;
 use crate::REDIS_JSON_TYPE;
 
@@ -151,21 +151,7 @@ where
                 .filter_map(|key| {
                     let key = ctx.open_key_writable(&key);
                     key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)
-                        .and_then(|value| {
-                            value
-                                .and_then(|doc| {
-                                    doc.get_values(&path)
-                                        .and_then(|values| {
-                                            values
-                                                .first()
-                                                .map(|v| RedisJSON::serialize(v, Format::JSON))
-                                                .transpose()
-                                        })
-                                        .transpose()
-                                })
-                                .transpose()
-                                .map_err(|e| e.into())
-                        })
+                        .and_then(|v| RedisJSON::path_to_json(v, &path).map_err(|e| e.into()))
                         .transpose()
                 })
                 .collect();
