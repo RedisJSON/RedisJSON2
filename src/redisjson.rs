@@ -346,9 +346,9 @@ impl RedisJSON {
         Ok(results)
     }
 
-    pub fn path_to_json<'a>(
+    pub fn path_to_json(
         value: Option<&mut RedisJSON>,
-        path: &'a str,
+        path: &str,
     ) -> Result<Option<String>, Error> {
         value
             .and_then(|doc| {
