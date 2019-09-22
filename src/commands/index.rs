@@ -1,12 +1,12 @@
-use serde_json::Value;
+use serde_json::{Map, Value};
 
-use redismodule::{Context, RedisError, RedisResult};
+use redismodule::{Context, RedisResult};
 use redismodule::{NextArg, REDIS_OK};
 
 use redisearch_api::{Document, FieldType};
 
 use crate::error::Error;
-use crate::redisjson::RedisJSON;
+use crate::redisjson::{Format, RedisJSON};
 use crate::schema::Schema;
 use crate::REDIS_JSON_TYPE;
 
@@ -146,15 +146,29 @@ where
         .ok_or("ERR no such index".into())
         .map(|schema| &schema.index)
         .and_then(|index| {
-            let results: Result<Vec<_>, RedisError> = index
-                .search(&query)?
-                .filter_map(|key| {
-                    let key = ctx.open_key_writable(&key);
-                    key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)
-                        .and_then(|v| RedisJSON::path_to_json(v, &path).map_err(|e| e.into()))
-                        .transpose()
-                })
-                .collect();
-            Ok(results?.into())
+            let result: Value =
+                index
+                    .search(&query)?
+                    .try_fold(Value::Object(Map::new()), |mut acc, key| {
+                        ctx.open_key_writable(&key)
+                            .get_value::<RedisJSON>(&REDIS_JSON_TYPE)
+                            .and_then(|doc| {
+                                doc.map_or(Ok(Vec::new()), |data| {
+                                    data.get_values(&path)
+                                        .map_err(|e| e.into()) // Convert Error to RedisError
+                                        .map(|values| {
+                                            values.iter().map(|val| (*val).clone()).collect()
+                                        })
+                                })
+                            })
+                            .map(|r| {
+                                acc.as_object_mut()
+                                    .unwrap()
+                                    .insert(key.to_string(), Value::Array(r));
+                                acc
+                            })
+                    })?;
+
+            Ok(RedisJSON::serialize(&result, Format::JSON)?.into())
         })
 }
