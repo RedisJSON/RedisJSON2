@@ -132,7 +132,7 @@ where
 
                 let ctx = Context::get_thread_safe_context();
                 let mut cursor: u64 = 0;
-                while {
+                loop {
                     ctx.lock();
                     let res = scan_and_index(&ctx, &schema, cursor);
                     ctx.unlock();
@@ -144,8 +144,10 @@ where
                             return;
                         }
                     }
-                    cursor != 0 // do-while loop
-                } {}
+                    if cursor == 0 {
+                        break;
+                    }
+                }
             });
 
             REDIS_OK
@@ -170,27 +172,19 @@ fn scan_and_index(ctx: &Context, schema: &Schema, cursor: u64) -> Result<u64, Re
                                 if let Some(data) = doc {
                                     if let Some(index) = &data.index {
                                         if schema.name == *index {
-                                            add_document(&key, &index, &data)
-                                                .map_err(|e| e)
-                                                .map(|_| ())
-                                        } else {
-                                            Ok(()) // skip document
+                                            add_document(key, index, data)?;
                                         }
-                                    } else {
-                                        Ok(()) // skip document
                                     }
+                                    Ok(())
                                 } else {
-                                    Err("Error on get value from key".into()) 
+                                    Err("Error on get value from key".into())
                                 }
                             })
                     } else {
                         Err("Error on parsing reply from scan".into()) 
                     }
                 });
-                match res {
-                    Err(e) => Err(e),
-                    Ok(_) => Ok(cursor), // return cursor for next call
-                }
+                res.map(|_| cursor)
             }
             _ => Err("Error on parsing reply from scan".into()), 
         },
@@ -226,7 +220,7 @@ where
                                     data.get_values(&path)
                                         .map_err(|e| e.into()) // Convert Error to RedisError
                                         .map(|values| {
-                                            values.iter().map(|val| (*val).clone()).collect()
+                                            values.into_iter().map(|val| val.clone()).collect()
                                         })
                                 })
                             })

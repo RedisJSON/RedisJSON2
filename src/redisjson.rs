@@ -356,7 +356,7 @@ pub mod type_methods {
     use super::*;
 
     #[allow(non_snake_case, unused)]
-    pub unsafe extern "C" fn rdb_load(rdb: *mut raw::RedisModuleIO, encver: c_int) -> *mut c_void {
+    pub extern "C" fn rdb_load(rdb: *mut raw::RedisModuleIO, encver: c_int) -> *mut c_void {
         let json = match encver {
             0 => RedisJSON {
                 data: backward::json_rdb_load(rdb),

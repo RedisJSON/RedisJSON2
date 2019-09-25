@@ -378,7 +378,7 @@ dependencies = [
 [[package]]
 name = "redisearch_api"
 version = "0.1.0"
-source = "git+https://github.com/RediSearch/redisearch-api-rs.git?branch=safe_context_rm_call#c9a28b506e9d468b3ef4af3f492eeb26abc43178"
+source = "git+https://github.com/RediSearch/redisearch-api-rs.git?branch=safe_context_rm_call#39c65422202d74fe807b58b52a7b5e4561de8647"
 dependencies = [
  "bindgen 0.51.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -405,7 +405,7 @@ dependencies = [
 [[package]]
 name = "redismodule"
 version = "0.3.0"
-source = "git+https://github.com/redislabsmodules/redismodule-rs.git?branch=safe_context_rm_call#6dba8a2678716a5c4e35dc5789076a32a39daeb0"
+source = "git+https://github.com/redislabsmodules/redismodule-rs.git?branch=safe_context_rm_call#da45393a643e0acda4665d94a8a2fcd24daa0e8c"
 dependencies = [
  "bindgen 0.51.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
