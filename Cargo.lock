@@ -405,7 +405,7 @@ dependencies = [
 [[package]]
 name = "redismodule"
 version = "0.3.0"
-source = "git+https://github.com/redislabsmodules/redismodule-rs.git?branch=safe_context_rm_call#0aca53deb78c5c0ce82fe52e52becb0961f1479e"
+source = "git+https://github.com/redislabsmodules/redismodule-rs.git?branch=safe_context_rm_call#6dba8a2678716a5c4e35dc5789076a32a39daeb0"
 dependencies = [
  "bindgen 0.51.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",

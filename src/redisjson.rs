@@ -385,5 +385,11 @@ pub mod type_methods {
     pub unsafe extern "C" fn rdb_save(rdb: *mut raw::RedisModuleIO, value: *mut c_void) {
         let json = &*(value as *mut RedisJSON);
         raw::save_string(rdb, &json.data.to_string());
+        if let Some(index) = &json.index {
+            raw::save_unsigned(rdb, 1);
+            raw::save_string(rdb, &index);
+        } else {
+            raw::save_unsigned(rdb, 0);
+        }
     }
 }
