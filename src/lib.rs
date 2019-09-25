@@ -132,7 +132,7 @@ fn json_set(ctx: &Context, args: Vec<String>) -> RedisResult {
         }
         (None, SetOptions::AlreadyExists) => Ok(RedisValue::None),
         (None, _) => {
-            let doc = RedisJSON::from_str(&value, format)?;
+            let doc = RedisJSON::from_str(&value, &index, format)?;
             if path == "$" {
                 redis_key.set_value(&REDIS_JSON_TYPE, doc)?;
 

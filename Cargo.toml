@@ -15,9 +15,9 @@ jsonpath_lib = { git="https://github.com/gkorland/jsonpath.git", branch="reaplce
 
 [dependencies.redismodule]
 git = "https://github.com/redislabsmodules/redismodule-rs.git"
-branch = "master"
+branch = "safe_context_rm_call"
 features = ["experimental-api"]
 
 [dependencies.redisearch_api]
 git = "https://github.com/RediSearch/redisearch-api-rs.git"
-branch = "master"
+branch = "safe_context_rm_call"

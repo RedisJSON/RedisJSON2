@@ -1,7 +1,8 @@
+use std::thread;
+
 use serde_json::{Map, Value};
 
-use redismodule::{Context, RedisResult};
-use redismodule::{NextArg, REDIS_OK};
+use redismodule::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_OK};
 
 use redisearch_api::{Document, FieldType};
 
@@ -75,13 +76,11 @@ pub fn add_document(key: &str, index_name: &str, doc: &RedisJSON) -> RedisResult
 
     let map = schema_map::as_ref();
 
-    map.get(index_name)
-        .ok_or("ERR no such index".into())
-        .and_then(|schema| {
-            let rsdoc = create_document(key, schema, doc)?;
-            schema.index.add_document(&rsdoc)?;
-            REDIS_OK
-        })
+    if let Some(schema) = map.get(index_name) {
+        let rsdoc = create_document(key, schema, doc)?;
+        schema.index.add_document(&rsdoc)?;
+    }
+    REDIS_OK
 }
 
 fn create_document(key: &str, schema: &Schema, doc: &RedisJSON) -> Result<Document, Error> {
@@ -121,11 +120,81 @@ where
     match subcommand.to_uppercase().as_str() {
         "ADD" => {
             let path = args.next_string()?;
-            add_field(&index_name, &field_name, &path)
+            add_field(&index_name, &field_name, &path)?;
+
+            // TODO handle another "ADD" calls in prallel a running call
+            thread::spawn(move || {
+                let schema = if let Some(stored_schema) = schema_map::as_ref().get(&index_name) {
+                    stored_schema
+                } else {
+                    return; // TODO handle this case
+                };
+
+                let ctx = Context::get_thread_safe_context();
+                let mut cursor: u64 = 0;
+                while {
+                    ctx.lock();
+                    let res = scan_and_index(&ctx, &schema, cursor);
+                    ctx.unlock();
+
+                    match res {
+                        Ok(c) => cursor = c,
+                        Err(e) => {
+                            eprintln!("Err on index {:?}", e); // TODO hadnle this better
+                            return;
+                        }
+                    }
+                    cursor != 0 // do-while loop
+                } {}
+            });
+
+            REDIS_OK
         }
         //"DEL" => {}
         //"INFO" => {}
         _ => Err("ERR unknown subcommand - try `JSON.INDEX HELP`".into()),
+    }
+}
+
+fn scan_and_index(ctx: &Context, schema: &Schema, cursor: u64) -> Result<u64, RedisError> {
+    let values = ctx.call("scan", &[&cursor.to_string()]);
+    match values {
+        Ok(RedisValue::Array(arr)) => match (arr.get(0), arr.get(1)) {
+            (Some(RedisValue::SimpleString(next_cursor)), Some(RedisValue::Array(keys))) => {
+                let cursor = next_cursor.parse().unwrap();
+                let res = keys.iter().try_for_each(|k| {
+                    if let RedisValue::SimpleString(key) = k {
+                        ctx.open_key(&key)
+                            .get_value::<RedisJSON>(&REDIS_JSON_TYPE)
+                            .and_then(|doc| {
+                                if let Some(data) = doc {
+                                    if let Some(index) = &data.index {
+                                        if schema.name == *index {
+                                            add_document(&key, &index, &data)
+                                                .map_err(|e| e)
+                                                .map(|_| ())
+                                        } else {
+                                            Ok(()) // skip document
+                                        }
+                                    } else {
+                                        Ok(()) // skip document
+                                    }
+                                } else {
+                                    Err("Error on get value from key".into()) 
+                                }
+                            })
+                    } else {
+                        Err("Error on parsing reply from scan".into()) 
+                    }
+                });
+                match res {
+                    Err(e) => Err(e),
+                    Ok(_) => Ok(cursor), // return cursor for next call
+                }
+            }
+            _ => Err("Error on parsing reply from scan".into()), 
+        },
+        _ => Err("Error on parsing reply from scan".into()), 
     }
 }
 
@@ -150,7 +219,7 @@ where
                 index
                     .search(&query)?
                     .try_fold(Value::Object(Map::new()), |mut acc, key| {
-                        ctx.open_key_writable(&key)
+                        ctx.open_key(&key)
                             .get_value::<RedisJSON>(&REDIS_JSON_TYPE)
                             .and_then(|doc| {
                                 doc.map_or(Ok(Vec::new()), |data| {

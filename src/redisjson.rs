@@ -41,6 +41,7 @@ impl Format {
 #[derive(Debug)]
 pub struct RedisJSON {
     data: Value,
+    pub index: Option<String>,
 }
 
 impl RedisJSON {
@@ -62,10 +63,14 @@ impl RedisJSON {
         }
     }
 
-    pub fn from_str(data: &str, format: Format) -> Result<Self, Error> {
+    pub fn from_str(data: &str, index: &Option<String>, format: Format) -> Result<Self, Error> {
         let value = RedisJSON::parse_str(data, format)?;
-        Ok(Self { data: value })
+        Ok(Self {
+            data: value,
+            index: index.clone(),
+        })
     }
+
     fn add_value(&mut self, path: &str, value: Value) -> Result<bool, Error> {
         if NodeVisitorImpl::check(path)? {
             let mut splits = path.rsplitn(2, '.');
@@ -355,8 +360,17 @@ pub mod type_methods {
         let json = match encver {
             0 => RedisJSON {
                 data: backward::json_rdb_load(rdb),
+                index: None, // TODO handle load from rdb
             },
-            2 => RedisJSON::from_str(&raw::load_string(rdb), Format::JSON).unwrap(),
+            2 => {
+                let data = raw::load_string(rdb);
+                let schema = if raw::load_unsigned(rdb) > 0 {
+                    Some(raw::load_string(rdb))
+                } else {
+                    None
+                };
+                RedisJSON::from_str(&data, &schema, Format::JSON).unwrap()
+            }
             _ => panic!("Can't load old RedisJSON RDB"),
         };
         Box::into_raw(Box::new(json)) as *mut c_void
