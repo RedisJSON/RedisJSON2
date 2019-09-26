@@ -20,7 +20,7 @@ mod schema; // TODO: Remove
 use crate::array_index::ArrayIndex;
 use crate::commands::index;
 use crate::error::Error;
-use crate::redisjson::{Format, RedisJSON, SetOptions};
+use crate::redisjson::{Format, PathBackward, RedisJSON, SetOptions};
 
 static REDIS_JSON_TYPE: RedisType = RedisType::new(
     "ReJSON-RL",
@@ -58,6 +58,23 @@ fn backwards_compat_path(mut path: String) -> String {
         }
     }
     return path;
+}
+
+///
+/// Backwards compatibility convertor for RedisJSON 1.x clients
+///
+fn backwards_compat_path_clone(path: String) -> PathBackward {
+    let mut fixed = path.clone();
+    if !fixed.starts_with("$") {
+        if fixed == "." {
+            fixed.replace_range(..1, "$");
+        } else if fixed.starts_with(".") {
+            fixed.insert(0, '$');
+        } else {
+            fixed.insert_str(0, "$.");
+        }
+    }
+    return PathBackward { path, fixed };
 }
 
 ///
@@ -165,7 +182,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
 
-    let mut paths: Vec<String> = vec![];
+    let mut paths: Vec<PathBackward> = vec![];
     let mut first_loop = true;
     let mut format = Format::JSON;
     loop {
@@ -174,7 +191,10 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
             Err(_) => {
                 // path is optional -> no path found on the first loop we use root "$"
                 if first_loop {
-                    paths.push("$".to_owned());
+                    paths.push(PathBackward {
+                        path: "$".to_owned(),
+                        fixed: "$".to_owned(),
+                    });
                 }
                 break;
             }
@@ -198,7 +218,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
                 format = Format::from_str(args.next_string()?.as_str())?;
             }
             _ => {
-                paths.push(backwards_compat_path(arg));
+                paths.push(backwards_compat_path_clone(arg));
             }
         };
     }
@@ -206,7 +226,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
     let key = ctx.open_key_writable(&key);
     let value = match key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)? {
         Some(doc) => if paths.len() == 1 {
-            doc.to_string(&paths[0], format)?
+            doc.to_string(&paths[0].fixed, format)?
         } else {
             // can't be smaller than 1
             doc.to_json(&mut paths)?

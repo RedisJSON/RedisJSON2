@@ -38,6 +38,11 @@ impl Format {
     }
 }
 
+pub struct PathBackward {
+    pub path: String,
+    pub fixed: String,
+}
+
 #[derive(Debug)]
 pub struct RedisJSON {
     data: Value,
@@ -168,10 +173,10 @@ impl RedisJSON {
 
     // FIXME: Implement this by manipulating serde_json::Value values,
     // and then using serde to serialize to JSON instead of doing it ourselves with strings.
-    pub fn to_json(&self, paths: &mut Vec<String>) -> Result<String, Error> {
+    pub fn to_json(&self, paths: &mut Vec<PathBackward>) -> Result<String, Error> {
         let mut selector = jsonpath_lib::selector(&self.data);
         let mut result = paths.drain(..).fold(String::from("{"), |mut acc, path| {
-            let value = match selector(&path) {
+            let value = match selector(&path.fixed) {
                 Ok(s) => match s.first() {
                     Some(v) => v,
                     None => &Value::Null,
@@ -179,7 +184,7 @@ impl RedisJSON {
                 Err(_) => &Value::Null,
             };
             acc.push('\"');
-            acc.push_str(&path);
+            acc.push_str(&path.path);
             acc.push_str("\":");
             acc.push_str(value.to_string().as_str());
             acc.push(',');
