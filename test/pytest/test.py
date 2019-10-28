@@ -5,6 +5,7 @@ import rmtest.config
 import redis
 import unittest
 import json
+import sys
 import os
 
 # Path to JSON test case files
@@ -66,7 +67,13 @@ docs = {
     },
 }
 
-rmtest.config.REDIS_MODULE = os.path.abspath(os.path.join(os.getcwd(), 'target/debug/libredisjson.so'))
+if len(sys.argv) >= 2:
+    lib_file = sys.argv[1]
+    del sys.argv[1:]
+else:
+    lib_file = 'target/debug/libredisjson.so'
+
+rmtest.config.REDIS_MODULE = os.path.abspath(os.path.join(os.getcwd(), lib_file))
 
 class BaseReJSONTest(BaseModuleTestCase):
     def getCacheInfo(self):
@@ -75,9 +82,6 @@ class BaseReJSONTest(BaseModuleTestCase):
         for x in range(0, len(res), 2):
             ret[res[x]] = res[x+1]
         return ret
-
-
-
 
 class ReJSONTestCase(BaseReJSONTest):
     """Tests ReJSON Redis module in vitro"""
@@ -749,11 +753,13 @@ class ReJSONTestCase(BaseReJSONTest):
             do('JSON.SET', 'joe', '.', '{"first": "Joe", "last": "Smith"}', 'INDEX', index)
             do('JSON.SET', 'kevin', '.', '{"first": "Kevin", "last": "Smith"}', 'INDEX', index)
             do('JSON.SET', 'mike', '.', '{"first": "Mike", "last": "Lane"}', 'INDEX', index)
+            do('JSON.SET', 'dave', '.', '{"first": "Dave"}', 'INDEX', index)
+            do('JSON.SET', 'levi', '.', '{"last": "Smith"}', 'INDEX', index)
 
             searches = [
-                ('@first:mike', '$.last', ['"Lane"']),
-                ('@last:smith', '$.first', ['"Joe"', '"Kevin"']),
-                ('*', '$.first', ['"Joe"', '"Kevin"', '"Mike"']),
+                ('@first:mike', '$.last',  '{"mike":["Lane"]}'),
+                ('@last:smith', '$.first', '{"joe":["Joe"],"kevin":["Kevin"],"levi":[]}'),
+                ('*', '$.first', '{"joe":["Joe"],"kevin":["Kevin"],"mike":["Mike"],"dave":["Dave"],"levi":[]}'),
             ]
 
             for (query, path, results) in searches:
