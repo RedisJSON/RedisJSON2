@@ -38,9 +38,28 @@ impl Format {
     }
 }
 
-pub struct PathBackward {
+///
+/// Backwards compatibility convertor for RedisJSON 1.x clients
+///
+pub struct Path {
     pub path: String,
     pub fixed: String,
+}
+
+impl Path {
+    pub fn new(path: String) -> Path {
+        let mut fixed = path.clone();
+        if !fixed.starts_with("$") {
+            if fixed == "." {
+                fixed.replace_range(..1, "$");
+            } else if fixed.starts_with(".") {
+                fixed.insert(0, '$');
+            } else {
+                fixed.insert_str(0, "$.");
+            }
+        }
+        Path{path, fixed}
+    }
 }
 
 #[derive(Debug)]
@@ -178,7 +197,7 @@ impl RedisJSON {
 
     // FIXME: Implement this by manipulating serde_json::Value values,
     // and then using serde to serialize to JSON instead of doing it ourselves with strings.
-    pub fn to_json(&self, paths: &mut Vec<PathBackward>) -> Result<String, Error> {
+    pub fn to_json(&self, paths: &mut Vec<Path>) -> Result<String, Error> {
         let mut selector = jsonpath_lib::selector(&self.data);
         let mut result = paths.drain(..).fold(String::from("{"), |mut acc, path| {
             let value = match selector(&path.fixed) {

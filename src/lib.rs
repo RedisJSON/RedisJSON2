@@ -20,7 +20,7 @@ mod schema; // TODO: Remove
 use crate::array_index::ArrayIndex;
 use crate::commands::index;
 use crate::error::Error;
-use crate::redisjson::{Format, PathBackward, RedisJSON, SetOptions};
+use crate::redisjson::{Format, Path, RedisJSON, SetOptions};
 
 static REDIS_JSON_TYPE: RedisType = RedisType::new(
     "ReJSON-RL",
@@ -58,23 +58,6 @@ fn backwards_compat_path(mut path: String) -> String {
         }
     }
     return path;
-}
-
-///
-/// Backwards compatibility convertor for RedisJSON 1.x clients
-///
-fn backwards_compat_path_clone(path: String) -> PathBackward {
-    let mut fixed = path.clone();
-    if !fixed.starts_with("$") {
-        if fixed == "." {
-            fixed.replace_range(..1, "$");
-        } else if fixed.starts_with(".") {
-            fixed.insert(0, '$');
-        } else {
-            fixed.insert_str(0, "$.");
-        }
-    }
-    return PathBackward { path, fixed };
 }
 
 ///
@@ -182,7 +165,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
     let mut args = args.into_iter().skip(1);
     let key = args.next_string()?;
 
-    let mut paths: Vec<PathBackward> = vec![];
+    let mut paths: Vec<Path> = vec![];
     let mut first_loop = true;
     let mut format = Format::JSON;
     loop {
@@ -191,10 +174,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
             Err(_) => {
                 // path is optional -> no path found on the first loop we use root "$"
                 if first_loop {
-                    paths.push(PathBackward {
-                        path: "$".to_owned(),
-                        fixed: "$".to_owned(),
-                    });
+                    paths.push(Path::new("$".to_string()));
                 }
                 break;
             }
@@ -218,7 +198,7 @@ fn json_get(ctx: &Context, args: Vec<String>) -> RedisResult {
                 format = Format::from_str(args.next_string()?.as_str())?;
             }
             _ => {
-                paths.push(backwards_compat_path_clone(arg));
+                paths.push(Path::new(arg));
             }
         };
     }
