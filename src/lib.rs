@@ -1,10 +1,10 @@
 #[macro_use]
-extern crate redismodule;
+extern crate redis_module;
 
-use redismodule::native_types::RedisType;
-use redismodule::raw::RedisModuleTypeMethods;
-use redismodule::{raw as rawmod, NextArg};
-use redismodule::{Context, RedisError, RedisResult, RedisValue, REDIS_OK};
+use redis_module::native_types::RedisType;
+use redis_module::raw::RedisModuleTypeMethods;
+use redis_module::{raw as rawmod, NextArg};
+use redis_module::{Context, RedisError, RedisResult, RedisValue, REDIS_OK};
 use serde_json::{Number, Value};
 
 use std::{i64, usize};
@@ -26,7 +26,7 @@ static REDIS_JSON_TYPE: RedisType = RedisType::new(
     "ReJSON-RL",
     2,
     RedisModuleTypeMethods {
-        version: redismodule::TYPE_METHOD_VERSION,
+        version: redis_module::TYPE_METHOD_VERSION,
 
         rdb_load: Some(redisjson::type_methods::rdb_load),
         rdb_save: Some(redisjson::type_methods::rdb_save),
