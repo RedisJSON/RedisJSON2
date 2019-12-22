@@ -209,27 +209,32 @@ where
         .ok_or("ERR no such index".into())
         .map(|schema| &schema.index)
         .and_then(|index| {
-            let result: Value =
+            let result =
                 index
                     .search(&query)?
                     .try_fold(Value::Object(Map::new()), |mut acc, key| {
-                        ctx.open_key(&key)
-                            .get_value::<RedisJSON>(&REDIS_JSON_TYPE)
-                            .and_then(|doc| {
-                                doc.map_or(Ok(Vec::new()), |data| {
-                                    data.get_values(&path)
-                                        .map_err(|e| e.into()) // Convert Error to RedisError
-                                        .map(|values| {
-                                            values.into_iter().map(|val| val.clone()).collect()
-                                        })
+                        let redis_key = ctx.open_key(&key);
+                        if redis_key.is_null() {
+                            // index.del_document(&key)?; // lazy delete doc that doesn't exist
+                            Ok(acc)
+                        } else {
+                            redis_key.get_value::<RedisJSON>(&REDIS_JSON_TYPE)
+                                .and_then(|doc| {
+                                    doc.map_or(Ok(Vec::new()), |data| {
+                                        data.get_values(&path)
+                                            .map_err(|e| e.into()) // Convert Error to RedisError
+                                            .map(|values| {
+                                                values.into_iter().map(|val| val.clone()).collect()
+                                            })
+                                    })
                                 })
-                            })
-                            .map(|r| {
-                                acc.as_object_mut()
-                                    .unwrap()
-                                    .insert(key.to_string(), Value::Array(r));
-                                acc
-                            })
+                                .map(|r| {
+                                    acc.as_object_mut()
+                                        .unwrap()
+                                        .insert(key.to_string(), Value::Array(r));
+                                    acc
+                                })
+                        }
                     })?;
 
             Ok(RedisJSON::serialize(&result, Format::JSON)?.into())

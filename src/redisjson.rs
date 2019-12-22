@@ -402,7 +402,8 @@ pub mod type_methods {
 
     #[allow(non_snake_case, unused)]
     pub unsafe extern "C" fn free(value: *mut c_void) {
-        Box::from_raw(value as *mut RedisJSON);
+        Box::from_raw(value as *mut RedisJSON); 
+        // TODO delete json key from index 
     }
 
     #[allow(non_snake_case, unused)]
