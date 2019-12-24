@@ -14,7 +14,7 @@ RedisJSON2 ([RedisJSON](https://github.com/RedisJSON/RedisJSON) nextgen) is a [R
 * [JSONPath](http://goessner.net/articles/JsonPath/) syntax for selecting elements inside documents
 * Documents are stored as binary data in a tree structure, allowing fast access to sub-elements
 * Typed atomic operations for all JSON values types
-* Secondery index support based on [RediSeach](http://redisearch.io)
+* Secondary index support based on [RediSearch](http://redisearch.io)
 
 ## Quick start
 
