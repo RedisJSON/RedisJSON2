@@ -82,5 +82,5 @@ cargo build --release
 ## Run
 
 ```
-redis-server --loadmodule ./target/release/libredisjson.so
+redis-server --loadmodule ./target/release/libredisjson.dylib
 ```
