@@ -1,6 +1,6 @@
 use std::thread;
 
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use redis_module::{Context, NextArg, RedisError, RedisResult, RedisValue, REDIS_OK};
 
@@ -181,14 +181,14 @@ fn scan_and_index(ctx: &Context, schema: &Schema, cursor: u64) -> Result<u64, Re
                                 }
                             })
                     } else {
-                        Err("Error on parsing reply from scan".into()) 
+                        Err("Error on parsing reply from scan".into())
                     }
                 });
                 res.map(|_| cursor)
             }
-            _ => Err("Error on parsing reply from scan".into()), 
+            _ => Err("Error on parsing reply from scan".into()),
         },
-        _ => Err("Error on parsing reply from scan".into()), 
+        _ => Err("Error on parsing reply from scan".into()),
     }
 }
 
@@ -209,29 +209,28 @@ where
         .ok_or("ERR no such index".into())
         .map(|schema| &schema.index)
         .and_then(|index| {
-            let result: Value =
-                index
-                    .search(&query)?
-                    .try_fold(Value::Object(Map::new()), |mut acc, key| {
-                        ctx.open_key(&key)
-                            .get_value::<RedisJSON>(&REDIS_JSON_TYPE)
-                            .and_then(|doc| {
-                                doc.map_or(Ok(Vec::new()), |data| {
-                                    data.get_values(&path)
-                                        .map_err(|e| e.into()) // Convert Error to RedisError
-                                        .map(|values| {
-                                            values.into_iter().map(|val| val.clone()).collect()
-                                        })
-                                })
-                            })
-                            .map(|r| {
-                                acc.as_object_mut()
-                                    .unwrap()
-                                    .insert(key.to_string(), Value::Array(r));
-                                acc
-                            })
-                    })?;
-
-            Ok(RedisJSON::serialize(&result, Format::JSON)?.into())
+            let result = index.search(&query)?.try_fold(Vec::new(), |mut acc, key| {
+                ctx.open_key(&key)
+                    .get_value::<RedisJSON>(&REDIS_JSON_TYPE)
+                    .and_then(|doc| {
+                        doc.map_or(Ok(Vec::new()), |data| {
+                            data.get_values(&path)
+                                .map_err(|e| e.into()) // Convert Error to RedisError
+                                .map(|values| values.into_iter().map(|val| val.clone()).collect())
+                        })
+                    })
+                    .map(|r| {
+                        let values = r
+                            .iter()
+                            .map(|v| RedisJSON::serialize(v, Format::JSON).unwrap().into())
+                            .collect();
+                        acc.push(vec![
+                            RedisValue::SimpleString(key.to_string()),
+                            RedisValue::Array(values),
+                        ]);
+                        acc
+                    })
+            })?;
+            Ok(result.into())
         })
 }
