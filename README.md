@@ -58,17 +58,31 @@ OK
 127.0.0.1:6379> json.index add person last $.last
 OK
 127.0.0.1:6379> JSON.QGET person Jo*
-"{\"user2\":[{\"last\":\"Joan\",\"first\":\"Mc\"}],\"user1\":[{\"last\":\"Joe\",\"first\":\"Mc\"}]}"
+1) 1) user1
+   2) 1) "{\"last\":\"Joe\",\"first\":\"Mc\"}"
+2) 1) user2
+   2) 1) "{\"last\":\"Joan\",\"first\":\"Mc\"}"
 127.0.0.1:6379> json.set user3 $ '{"last":"Joel", "first":"Dan"}' INDEX person
 OK
 127.0.0.1:6379> JSON.QGET person Jo*
-"{\"user2\":[{\"last\":\"Joan\",\"first\":\"Mc\"}],\"user1\":[{\"last\":\"Joe\",\"first\":\"Mc\"}],\"user3\":[{\"last\":\"Joel\",\"first\":\"Dan\"}]}"
+1) 1) user1
+   2) 1) "{\"last\":\"Joe\",\"first\":\"Mc\"}"
+2) 1) user2
+   2) 1) "{\"last\":\"Joan\",\"first\":\"Mc\"}"
+3) 1) user3
+   2) 1) "{\"last\":\"Joel\",\"first\":\"Dan\"}"
 127.0.0.1:6379> json.index add person first $.first
 OK
 127.0.0.1:6379> JSON.QGET person Mc
-"{\"user2\":[{\"last\":\"Joan\",\"first\":\"Mc\"}],\"user1\":[{\"last\":\"Joe\",\"first\":\"Mc\"}]}"
+1) 1) user1
+   2) 1) "{\"last\":\"Joe\",\"first\":\"Mc\"}"
+2) 1) user2
+   2) 1) "{\"last\":\"Joan\",\"first\":\"Mc\"}"
 127.0.0.1:6379> JSON.QGET person Mc $.last
-"{\"user2\":[\"Joan\"],\"user1\":[\"Joe\"]}"
+1) 1) user1
+   2) 1) "\"Joe\""
+2) 1) user2
+   2) 1) "\"Joan\""
 ```
     
 
