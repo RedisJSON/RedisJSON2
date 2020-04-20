@@ -1,3 +1,6 @@
+# This repository was deprecated and all future development was moved to https://github.com/RedisJSON/RedisJSON
+
+
 [![GitHub issues](https://img.shields.io/github/release/RedisJSON/RedisJSON2.svg)](https://github.com/RedisJSON/RedisJSON2/releases/latest)
 [![CircleCI](https://circleci.com/gh/RedisJSON/RedisJSON2/tree/master.svg?style=svg)](https://circleci.com/gh/RedisJSON/RedisJSON2/tree/master)
 [![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/redislabs/redisjson2.svg)](https://hub.docker.com/r/redislabs/redisjson2/builds/)
